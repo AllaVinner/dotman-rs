@@ -1,3 +1,7 @@
+mod arg_parser;
+mod config;
+
 fn main() {
-    println!("Hello, world!");
+    arg_parser::parse_args();
+    config::test();
 }
