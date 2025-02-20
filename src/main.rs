@@ -7,6 +7,8 @@ use std::{env::current_dir, path::PathBuf};
 mod arg_parser;
 mod config;
 
+const HOME_ENV: &str = if cfg!(test) { "TEST_HOME" } else { "HOME" };
+
 #[derive(Debug)]
 struct DotRecord {
     link: PathBuf,
@@ -98,7 +100,7 @@ fn main_atomic() {
 
 fn normalize_path<P: AsRef<Path>>(p: P) -> PathBuf {
     let p = p.as_ref();
-    let home = env::var("HOME").unwrap();
+    let home = env::var(HOME_ENV).unwrap();
     let cwd = env::current_dir().unwrap();
     let mut path_buff = PathBuf::new();
     use std::path::Component as C;
@@ -149,4 +151,14 @@ fn main() {
     println!("{}", cp.display());
     let cp = normalize_path("/c/d");
     println!("{}", cp.display());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_env_var_processing() {
+        assert_eq!(HOME_ENV, "TEST_A");
+    }
 }
