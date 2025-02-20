@@ -98,10 +98,14 @@ fn main_atomic() {
     }
 }
 
-fn normalize_path<P: AsRef<Path>>(p: P) -> PathBuf {
+fn normalize_path<P: AsRef<Path>, H: AsRef<Path>, W: AsRef<Path>>(
+    p: P,
+    home: H,
+    cwd: W,
+) -> PathBuf {
     let p = p.as_ref();
-    let home = env::var(HOME_ENV).unwrap();
-    let cwd = env::current_dir().unwrap();
+    let home = home.as_ref();
+    let cwd = cwd.as_ref();
     let mut path_buff = PathBuf::new();
     use std::path::Component as C;
     if let Some(first) = p.components().next() {
@@ -141,16 +145,15 @@ fn normalize_path<P: AsRef<Path>>(p: P) -> PathBuf {
 }
 
 fn main() {
-    let cp = normalize_path("./c/b/c");
-    println!("{}", cp.display());
-    let cp = normalize_path("c/b/c");
-    println!("{}", cp.display());
-    let cp = normalize_path("~/c/b/c");
-    println!("{}", cp.display());
-    let cp = normalize_path("~/c/~/d");
-    println!("{}", cp.display());
-    let cp = normalize_path("/c/d");
-    println!("{}", cp.display());
+    // let cp = normalize_path("./c/b/c");
+    // println!("{}", cp.display());
+    // let cp = normalize_path("c/b/c");
+    // println!("{}", cp.display());
+    // let cp = normalize_path("~/c/b/c");
+    // println!("{}", cp.display());
+    // let cp = normalize_path("~/c/~/d");
+    // println!("{}", cp.display());
+    // let cp = normalize_path("/c/d");
 }
 
 #[cfg(test)]
@@ -159,6 +162,30 @@ mod tests {
 
     #[test]
     fn test_env_var_processing() {
-        assert_eq!(HOME_ENV, "TEST_A");
+        assert_eq!(HOME_ENV, "TEST_HOME");
+    }
+
+    #[test]
+    fn test_normalize_path() {
+        let home = "/h";
+        let cwd = "/h/w";
+        let p = "p";
+        let expected = "/h/w/p";
+        assert_eq!(normalize_path(p, home, cwd).to_str().unwrap(), expected);
+        let p = "p/q/";
+        let expected = "/h/w/p/q";
+        assert_eq!(normalize_path(p, home, cwd).to_str().unwrap(), expected);
+        let p = "p/q/../x";
+        let expected = "/h/w/p/x";
+        assert_eq!(normalize_path(p, home, cwd).to_str().unwrap(), expected);
+        let p = "p/q/../.././../y";
+        let expected = "/h/y";
+        assert_eq!(normalize_path(p, home, cwd).to_str().unwrap(), expected);
+        let p = "~/a";
+        let expected = "/h/a";
+        assert_eq!(normalize_path(p, home, cwd).to_str().unwrap(), expected);
+        let p = "/a";
+        let expected = "/a";
+        assert_eq!(normalize_path(p, home, cwd).to_str().unwrap(), expected);
     }
 }
