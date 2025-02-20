@@ -20,7 +20,7 @@ enum AddError {
     SourceNotFound(PathBuf),
     TargetExists(PathBuf),
     ConfigError(String),
-    RollbackError((Box<AddError>, io::Error)),
+    RollbackError((io::Error, io::Error)),
 }
 
 impl From<io::Error> for AddError {
@@ -47,11 +47,23 @@ impl fmt::Display for AddError {
     }
 }
 
-fn naive_add<S: AsRef<Path>, T: AsRef<Path>>(source: S, target: T) -> Result<(), AddError> {
+fn naive_add<S: AsRef<Path>, T: AsRef<Path>>(source: S, target: T) -> Result<(), io::Error> {
     fs::rename(&source, &target)?;
     unix_fs::symlink(&target, &source)?;
     // TODO: add record stuff
     return Ok(());
+}
+
+fn rollback_add<S: AsRef<Path>, T: AsRef<Path>>(source: S, target: T) -> Result<(), io::Error> {
+    let source = source.as_ref();
+    let target = target.as_ref();
+    if source.exists() && source.is_symlink() {
+        fs::remove_file(source)?;
+    }
+    if target.exists() && !source.exists() {
+        fs::rename(target, source)?;
+    }
+    Ok(())
 }
 
 fn atomic_add<S: AsRef<Path>, T: AsRef<Path>>(source: S, target: T) -> Result<(), AddError> {
@@ -66,27 +78,12 @@ fn atomic_add<S: AsRef<Path>, T: AsRef<Path>>(source: S, target: T) -> Result<()
     if let Some(parent) = target.parent() {
         fs::create_dir_all(parent)?;
     }
-    match naive_add(source, target) {
-        Ok(_) => (),
-        Err(err) => {
-            if source.exists() && source.is_symlink() {
-                match fs::remove_file(source) {
-                    Ok(_) => (),
-                    Err(rollback_err) => {
-                        return Err(AddError::RollbackError((err.into(), rollback_err)));
-                    }
-                }
-            }
-            if target.exists() && !source.exists() {
-                match fs::rename(target, source) {
-                    Ok(_) => (),
-                    Err(rollback_err) => {
-                        return Err(AddError::RollbackError((err.into(), rollback_err)));
-                    }
-                }
-            }
-            return Err(err);
+    let result = naive_add(source, target);
+    if let Err(err) = result {
+        if let Err(rollback_error) = rollback_add(source, target) {
+            return Err(AddError::RollbackError((err, rollback_error)));
         }
+        return Err(AddError::IO(err));
     }
     return Ok(());
 }
