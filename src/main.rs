@@ -11,6 +11,7 @@ use clap::Parser;
 mod arg_parser;
 mod cli;
 mod config;
+mod init;
 mod setup;
 
 const HOME_ENV: &str = if cfg!(test) { "TEST_HOME" } else { "HOME" };
@@ -141,47 +142,8 @@ fn normalize_path<P: AsRef<Path>, H: AsRef<Path>, W: AsRef<Path>>(
     return path_buff;
 }
 
-#[derive(Debug)]
-enum InitError {
-    ConfigFileExists,
-    EnsureFoldersError(io::Error),
-    WriteError(config::WriteError),
-}
-
-impl Error for InitError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            InitError::WriteError(e) => Some(e),
-            _ => None,
-        }
-    }
-}
-
-impl Display for InitError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::ConfigFileExists => write!(f, "Project already initialized"),
-            Self::EnsureFoldersError(e) => write!(f, "{}", e),
-            Self::WriteError(e) => write!(f, "{}", e),
-        }
-    }
-}
-
-fn init_project<P: AsRef<Path>>(project: P) -> Result<(), InitError> {
-    use InitError as E;
-    let project = project.as_ref();
-    let config_path = project.join(CONFIG_FILE_NAME);
-    if config_path.exists() {
-        return Err(E::ConfigFileExists);
-    }
-    create_dir_all(project).map_err(|op| E::EnsureFoldersError(op))?;
-    let config = config::DotConfig::new();
-    config.write(&config_path).map_err(|e| E::WriteError(e))?;
-    return Ok(());
-}
-
 fn main_init() {
-    match init_project("project") {
+    match init::init_project("project") {
         Ok(()) => println!("Success create project"),
         Err(e) => eprintln!("Error creating project: {:?}", e),
     }
@@ -202,8 +164,16 @@ fn main_add() {
 fn run_command(command: cli::Commands) -> Result<(), Box<dyn Error>> {
     match command {
         cli::Commands::Init(cmd_args) => {
-            init_project(cmd_args.project.unwrap_or(".".into()))?;
+            init::init_project(cmd_args.project)?;
         }
+        cli::Commands::Setup(sa) => setup_project(sa.base_dir, sa.setup_type)?,
+    }
+    Ok(())
+}
+
+fn setup_project<P: AsRef<Path>>(base_dir: P, setup_type: cli::SetupType) -> Result<(), io::Error> {
+    match setup_type {
+        cli::SetupType::NewUser => setup::setup_new_user(base_dir)?,
     }
     Ok(())
 }
