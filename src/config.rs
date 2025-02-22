@@ -1,5 +1,7 @@
 use std::{
     collections::BTreeMap,
+    error::Error,
+    fmt::{write, Display},
     fs, io,
     path::{Path, PathBuf},
 };
@@ -20,6 +22,24 @@ pub struct DotConfig {
 pub enum WriteError {
     SerializationError(toml::ser::Error),
     WriteError(io::Error),
+}
+
+impl Display for WriteError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::SerializationError(e) => write!(f, "Could not serialize config: {}", e),
+            Self::WriteError(e) => write!(f, "{}", e),
+        }
+    }
+}
+
+impl Error for WriteError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::SerializationError(e) => Some(e),
+            Self::WriteError(e) => Some(e),
+        }
+    }
 }
 
 impl DotConfig {

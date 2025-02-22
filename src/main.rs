@@ -1,12 +1,15 @@
+use std::error::Error;
+use std::fmt::Display;
 use std::fs::create_dir_all;
 use std::os::unix::fs as unix_fs;
 use std::path::Path;
 use std::{env, fmt, fs, io};
 use std::{env::current_dir, path::PathBuf};
 
-use serde::de::Error;
+use clap::Parser;
 
 mod arg_parser;
+mod cli;
 mod config;
 mod setup;
 
@@ -145,6 +148,25 @@ enum InitError {
     WriteError(config::WriteError),
 }
 
+impl Error for InitError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            InitError::WriteError(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
+impl Display for InitError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ConfigFileExists => write!(f, "Project already initialized"),
+            Self::EnsureFoldersError(e) => write!(f, "{}", e),
+            Self::WriteError(e) => write!(f, "{}", e),
+        }
+    }
+}
+
 fn init_project<P: AsRef<Path>>(project: P) -> Result<(), InitError> {
     use InitError as E;
     let project = project.as_ref();
@@ -177,8 +199,28 @@ fn main_add() {
     }
 }
 
+fn run_command(command: cli::Commands) -> Result<(), Box<dyn Error>> {
+    match command {
+        cli::Commands::Init(cmd_args) => {
+            init_project(cmd_args.project.unwrap_or(".".into()))?;
+        }
+    }
+    Ok(())
+}
+
+fn main_cli() {
+    let args = cli::CLI::parse();
+    match run_command(args.clone().command.unwrap()) {
+        Err(e) => {
+            eprintln!("{}", e);
+            std::process::exit(1);
+        }
+        Ok(o) => (),
+    };
+}
+
 fn main() {
-    main_init();
+    main_cli();
 }
 
 #[cfg(test)]
