@@ -1,13 +1,17 @@
-use std::ops::Add;
+use std::fs::create_dir_all;
 use std::os::unix::fs as unix_fs;
 use std::path::Path;
 use std::{env, fmt, fs, io};
 use std::{env::current_dir, path::PathBuf};
 
+use serde::de::Error;
+
 mod arg_parser;
 mod config;
+mod setup;
 
 const HOME_ENV: &str = if cfg!(test) { "TEST_HOME" } else { "HOME" };
+const CONFIG_FILE_NAME: &str = ".dotman";
 
 #[derive(Debug)]
 struct DotRecord {
@@ -88,13 +92,6 @@ fn atomic_add<S: AsRef<Path>, T: AsRef<Path>>(source: S, target: T) -> Result<()
     return Ok(());
 }
 
-fn main_atomic() {
-    match atomic_add("./data/x/y", "./data/f") {
-        Ok(_) => println!("Success"),
-        Err(e) => eprintln!("{}", e),
-    }
-}
-
 fn normalize_path<P: AsRef<Path>, H: AsRef<Path>, W: AsRef<Path>>(
     p: P,
     home: H,
@@ -141,16 +138,47 @@ fn normalize_path<P: AsRef<Path>, H: AsRef<Path>, W: AsRef<Path>>(
     return path_buff;
 }
 
+#[derive(Debug)]
+enum InitError {
+    ConfigFileExists,
+    EnsureFoldersError(io::Error),
+    WriteError(config::WriteError),
+}
+
+fn init_project<P: AsRef<Path>>(project: P) -> Result<(), InitError> {
+    use InitError as E;
+    let project = project.as_ref();
+    let config_path = project.join(CONFIG_FILE_NAME);
+    if config_path.exists() {
+        return Err(E::ConfigFileExists);
+    }
+    create_dir_all(project).map_err(|op| E::EnsureFoldersError(op))?;
+    let config = config::DotConfig::new();
+    config.write(&config_path).map_err(|e| E::WriteError(e))?;
+    return Ok(());
+}
+
+fn main_init() {
+    match init_project("project") {
+        Ok(()) => println!("Success create project"),
+        Err(e) => eprintln!("Error creating project: {:?}", e),
+    }
+}
+
+fn main_add() {
+    let home = env::var(HOME_ENV).unwrap();
+    let cwd = env::current_dir().unwrap();
+    let source = normalize_path("data/x/y", &home, &cwd);
+    let target = normalize_path("data/f", &home, &cwd);
+    let source_from_home = source.strip_prefix(home).unwrap();
+    match atomic_add(source, target) {
+        Ok(_) => println!("Success"),
+        Err(e) => eprintln!("{}", e),
+    }
+}
+
 fn main() {
-    // let cp = normalize_path("./c/b/c");
-    // println!("{}", cp.display());
-    // let cp = normalize_path("c/b/c");
-    // println!("{}", cp.display());
-    // let cp = normalize_path("~/c/b/c");
-    // println!("{}", cp.display());
-    // let cp = normalize_path("~/c/~/d");
-    // println!("{}", cp.display());
-    // let cp = normalize_path("/c/d");
+    main_init();
 }
 
 #[cfg(test)]

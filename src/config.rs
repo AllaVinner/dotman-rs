@@ -1,4 +1,8 @@
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{
+    collections::BTreeMap,
+    fs, io,
+    path::{Path, PathBuf},
+};
 
 use serde::{Deserialize, Serialize};
 use toml;
@@ -8,19 +12,38 @@ type Link = PathBuf;
 type Records<K, V> = BTreeMap<K, V>;
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
-struct DotConfig {
+pub struct DotConfig {
     records: Records<Target, Link>,
 }
 
-pub fn test_config() {
-    let config = DotConfig {
-        records: Records::from([
-            (PathBuf::from("A"), PathBuf::from("a")),
-            (PathBuf::from("~/Applications/df as/s"), PathBuf::from("a")),
-        ]),
-    };
+#[derive(Debug)]
+pub enum WriteError {
+    SerializationError(toml::ser::Error),
+    WriteError(io::Error),
+}
 
-    println!("{}", toml::to_string(&config).unwrap())
+impl DotConfig {
+    pub fn new() -> Self {
+        Self {
+            records: Records::new(),
+        }
+    }
+
+    pub fn write<P: AsRef<Path>>(&self, path: P) -> Result<(), WriteError> {
+        use WriteError as E;
+        let config_str = toml::to_string_pretty(self).map_err(|e| E::SerializationError(e))?;
+        fs::write(path.as_ref(), config_str).map_err(|e| E::WriteError(e))?;
+        return Ok(());
+    }
+}
+
+pub fn test_config() {
+    let toml_content = r#"[recordsa]
+A = "a"
+B = "~/a/b/c"
+"a/b" = "~/a/b"
+"#;
+    let actual: DotConfig = toml::from_str(toml_content).unwrap();
 }
 
 #[cfg(test)]
