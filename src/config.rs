@@ -42,6 +42,30 @@ impl Error for WriteError {
     }
 }
 
+#[derive(Debug)]
+pub enum ReadError {
+    ReadError(io::Error),
+    DeSerializationError(toml::de::Error),
+}
+
+impl Display for ReadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DeSerializationError(e) => write!(f, "Could not deserialize config: {}", e),
+            Self::ReadError(e) => write!(f, "{}", e),
+        }
+    }
+}
+
+impl Error for ReadError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            Self::DeSerializationError(e) => Some(e),
+            Self::ReadError(e) => Some(e),
+        }
+    }
+}
+
 impl DotConfig {
     pub fn new() -> Self {
         Self {
@@ -54,6 +78,14 @@ impl DotConfig {
         let config_str = toml::to_string_pretty(self).map_err(|e| E::SerializationError(e))?;
         fs::write(path.as_ref(), config_str).map_err(|e| E::WriteError(e))?;
         return Ok(());
+    }
+
+    pub fn from_file<P: AsRef<Path>>(config_path: P) -> Result<Self, ReadError> {
+        use ReadError as E;
+        let toml_content = fs::read_to_string(config_path).map_err(|e| E::ReadError(e))?;
+        let config: DotConfig =
+            toml::from_str(&toml_content).map_err(|e| E::DeSerializationError(e))?;
+        return Ok(config);
     }
 }
 
@@ -68,7 +100,6 @@ B = "~/a/b/c"
 
 #[cfg(test)]
 mod tests {
-    // Note this useful idiom: importing names from outer (for mod tests) scope.
     use super::*;
 
     #[test]
