@@ -1,3 +1,4 @@
+use std::env::current_dir;
 use std::error::Error;
 use std::fs;
 use std::path::Path;
@@ -36,12 +37,17 @@ fn main_add() {
 }
 
 fn run_command(command: cli::Commands) -> Result<(), Box<dyn Error>> {
+    let home = env::var(HOME_ENV).expect("Home var not set.");
+    let cwd = current_dir().expect("There is a current dir.");
     match command {
         cli::Commands::Init(cmd_args) => {
             init::init_project(cmd_args.project)?;
         }
         cli::Commands::Setup(sa) => setup_project(sa.base_dir, sa.setup_type)?,
-        cli::Commands::Add(sa) => add::add(sa.source, sa.target)?,
+        cli::Commands::Add(sa) => add::add(
+            utils::normalize_path(sa.source, &home, &cwd),
+            utils::normalize_path(sa.target, &home, &cwd),
+        )?,
     }
     Ok(())
 }
