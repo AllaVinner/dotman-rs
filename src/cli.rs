@@ -15,6 +15,7 @@ pub enum Commands {
     Init(InitArgs),
     /// Setup example directories
     Setup(SetupArgs),
+    Add(AddArgs),
 }
 
 #[derive(Args, Debug, Clone)]
@@ -36,4 +37,10 @@ pub struct SetupArgs {
 #[derive(ValueEnum, Debug, Clone, Copy)]
 pub enum SetupType {
     NewUser,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct AddArgs {
+    pub source: PathBuf,
+    pub target: PathBuf,
 }
