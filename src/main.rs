@@ -185,7 +185,7 @@ fn main_cli() {
             eprintln!("{}", e);
             std::process::exit(1);
         }
-        Ok(o) => (),
+        Ok(_) => (),
     };
 }
 
@@ -195,7 +195,22 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+
+    use chrono;
+    use std::env::temp_dir;
+
     use super::*;
+    use rstest::{fixture, rstest};
+
+    #[fixture]
+    #[once]
+    pub fn root_dir() -> PathBuf {
+        let time_format = "%Y-%m-%d_%H-%M-%S";
+        let current_time = chrono::offset::Local::now();
+        let current_time_str = format!("{}", current_time.format(time_format));
+        let base_name = "dotman-rs-test_";
+        return temp_dir().join(base_name.to_owned() + &current_time_str);
+    }
 
     #[test]
     fn test_env_var_processing() {
