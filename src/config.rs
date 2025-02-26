@@ -1,7 +1,7 @@
 use std::{
     collections::BTreeMap,
     error::Error,
-    fmt::{write, Display},
+    fmt::Display,
     fs, io,
     path::{Path, PathBuf},
 };
@@ -87,15 +87,6 @@ impl DotConfig {
             toml::from_str(&toml_content).map_err(|e| E::DeSerializationError(e))?;
         return Ok(config);
     }
-}
-
-pub fn test_config() {
-    let toml_content = r#"[recordsa]
-A = "a"
-B = "~/a/b/c"
-"a/b" = "~/a/b"
-"#;
-    let actual: DotConfig = toml::from_str(toml_content).unwrap();
 }
 
 #[cfg(test)]

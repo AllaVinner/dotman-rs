@@ -1,7 +1,7 @@
 use std::{
     fs::{self, create_dir, create_dir_all},
     io,
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 pub fn setup_new_user<P: AsRef<Path>>(base_dir: P) -> io::Result<()> {

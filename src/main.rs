@@ -1,14 +1,12 @@
+#![allow(dead_code)]
 use std::env::current_dir;
 use std::error::Error;
-use std::fs;
 use std::path::Path;
-use std::path::PathBuf;
-use std::{env, fmt, io};
+use std::{env, io};
 
 use clap::Parser;
 
 mod add;
-mod arg_parser;
 mod cli;
 mod config;
 mod init;
@@ -18,18 +16,12 @@ mod utils;
 const HOME_ENV: &str = if cfg!(test) { "TEST_HOME" } else { "HOME" };
 const CONFIG_FILE_NAME: &str = ".dotman";
 
-// #[derive(Debug)]
-// struct DotRecord {
-//     link: PathBuf,
-//     target: PathBuf,
-// }
-
+#[allow(dead_code)]
 fn main_add() {
     let home = env::var(HOME_ENV).unwrap();
     let cwd = env::current_dir().unwrap();
     let source = utils::normalize_path("data/x/y", &home, &cwd);
     let target = utils::normalize_path("data/f", &home, &cwd);
-    let source_from_home = source.strip_prefix(home).unwrap();
     match add::add(source, target) {
         Ok(_) => println!("Success"),
         Err(e) => eprintln!("{}", e),
@@ -80,11 +72,12 @@ mod tests {
     use chrono;
     use std::{
         env::{current_dir, temp_dir},
-        fs::{self, create_dir},
+        fs::create_dir,
+        path::PathBuf,
     };
 
     use super::*;
-    use rstest::{fixture, rstest};
+    use rstest::fixture;
 
     const TEST_BASE_DIR_ENV: &str = "TEST_BASE_DIR";
 

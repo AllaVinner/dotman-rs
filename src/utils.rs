@@ -14,11 +14,11 @@ pub fn normalize_path<P: AsRef<Path>, H: AsRef<Path>, W: AsRef<Path>>(
         match first {
             C::Normal(c) => {
                 if c.to_str().unwrap() != "~" {
-                    path_buff = cwd.clone().into();
+                    path_buff = cwd.into();
                 }
             }
             C::CurDir => {
-                path_buff = cwd.clone().into();
+                path_buff = cwd.into();
             }
             _ => (),
         }
@@ -31,7 +31,7 @@ pub fn normalize_path<P: AsRef<Path>, H: AsRef<Path>, W: AsRef<Path>>(
             }
             C::Normal(c) => {
                 if c.to_str().unwrap() == "~" {
-                    path_buff = home.clone().into();
+                    path_buff = home.into();
                 } else {
                     path_buff.push(c);
                 }
