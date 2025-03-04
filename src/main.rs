@@ -5,6 +5,7 @@ use std::path::Path;
 use std::{env, io};
 
 use clap::Parser;
+use utils::AbsPath;
 
 mod add;
 mod cli;
@@ -16,7 +17,6 @@ mod utils;
 const HOME_ENV: &str = if cfg!(test) { "TEST_HOME" } else { "HOME" };
 const CONFIG_FILE_NAME: &str = ".dotman";
 
-#[allow(dead_code)]
 fn main_add() {
     let home = env::var(HOME_ENV).unwrap();
     let cwd = env::current_dir().unwrap();
@@ -33,7 +33,7 @@ fn run_command(command: cli::Commands) -> Result<(), Box<dyn Error>> {
     let cwd = current_dir().expect("There is a current dir.");
     match command {
         cli::Commands::Init(cmd_args) => {
-            init::init_project(cmd_args.project)?;
+            init::init_project(&AbsPath::new(cmd_args.project).unwrap())?;
         }
         cli::Commands::Setup(sa) => setup_project(sa.base_dir, sa.setup_type)?,
         cli::Commands::Add(sa) => add::add(
@@ -85,7 +85,7 @@ mod tests {
     #[once]
     pub fn root_dir() -> PathBuf {
         let test_base_dir = if let Ok(test_base_dir) = env::var(TEST_BASE_DIR_ENV) {
-            let home = env::var("HOME").expect("Home var not set.");
+            let home = env::var("HOME").expect("Home env var set.");
             let cwd = current_dir().expect("There is a current dir.");
             utils::normalize_path(test_base_dir, home, cwd)
         } else {

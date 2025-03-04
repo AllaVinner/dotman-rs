@@ -1,3 +1,4 @@
+use core::fmt;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
@@ -16,11 +17,25 @@ impl AbsPath {
             Err(AbsPathError(path.to_string_lossy().to_string()))
         }
     }
+
+    pub fn join<P: AsRef<Path>>(&self, path: P) -> Self {
+        Self(resolve_path(self.0.join(path)))
+    }
+
+    pub fn exists(&self) -> bool {
+        self.0.exists()
+    }
 }
 
 impl AsRef<Path> for AbsPath {
     fn as_ref(&self) -> &Path {
         &self.0
+    }
+}
+
+impl fmt::Display for AbsPath {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0.display())
     }
 }
 

@@ -3,10 +3,9 @@ use std::{
     fmt::{self, Display},
     fs::create_dir_all,
     io,
-    path::Path,
 };
 
-use crate::{config, CONFIG_FILE_NAME};
+use crate::{config, utils::AbsPath, CONFIG_FILE_NAME};
 
 #[derive(Debug)]
 pub enum InitError {
@@ -34,7 +33,7 @@ impl Display for InitError {
     }
 }
 
-pub fn init_project<P: AsRef<Path>>(project: P) -> Result<(), InitError> {
+pub fn init_project(project: &AbsPath) -> Result<(), InitError> {
     use InitError as E;
     let project = project.as_ref();
     let config_path = project.join(CONFIG_FILE_NAME);
@@ -58,9 +57,8 @@ mod tests {
 
     #[rstest]
     fn basic_init(root_dir: &PathBuf) {
-        let test_dir = root_dir.join("basic_init");
+        let test_dir = AbsPath::new(root_dir.join("basic_init")).unwrap();
         create_dir(&test_dir).expect("Could not create `test_dir`.");
-        println!("{}", test_dir.to_str().unwrap());
         let config = test_dir.join(CONFIG_FILE_NAME);
         let _ = create_dir(&test_dir);
         assert!(init_project(&test_dir).is_ok());
@@ -72,7 +70,7 @@ mod tests {
 
     #[rstest]
     fn basic_deep_init(root_dir: &PathBuf) {
-        let test_dir = root_dir.join("basic_deep_init");
+        let test_dir = AbsPath::new(root_dir.join("basic_deep_init")).unwrap();
         assert!(!test_dir.exists());
         let config = test_dir.join(CONFIG_FILE_NAME);
         let _ = create_dir(&test_dir);
