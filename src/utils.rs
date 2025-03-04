@@ -1,4 +1,50 @@
 use std::path::{Path, PathBuf};
+use thiserror::Error;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AbsPath(PathBuf);
+
+#[derive(Error, Debug, Clone, PartialEq)]
+#[error("{0} must be absolute")]
+pub struct AbsPathError(String);
+impl AbsPath {
+    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, AbsPathError> {
+        let path = resolve_path(path);
+        if path.is_absolute() {
+            Ok(Self(path.into()))
+        } else {
+            Err(AbsPathError(path.to_string_lossy().to_string()))
+        }
+    }
+}
+
+impl AsRef<Path> for AbsPath {
+    fn as_ref(&self) -> &Path {
+        &self.0
+    }
+}
+
+pub fn resolve_path<P: AsRef<Path>>(path: P) -> PathBuf {
+    let path = path.as_ref();
+    let mut path_buff = PathBuf::new();
+    use std::path::Component as C;
+    for component in path.components() {
+        match component {
+            C::CurDir => (),
+            C::ParentDir => {
+                path_buff.pop();
+            }
+            C::Normal(c) => path_buff.push(c),
+            C::RootDir => {
+                path_buff = PathBuf::from("/");
+            }
+            C::Prefix(_) => {
+                path_buff = PathBuf::from("/");
+            }
+        }
+    }
+    return path_buff;
+}
 
 pub fn normalize_path<P: AsRef<Path>, H: AsRef<Path>, W: AsRef<Path>>(
     p: P,
@@ -8,42 +54,30 @@ pub fn normalize_path<P: AsRef<Path>, H: AsRef<Path>, W: AsRef<Path>>(
     let p = p.as_ref();
     let home = home.as_ref();
     let cwd = cwd.as_ref();
-    let mut path_buff = PathBuf::new();
     use std::path::Component as C;
-    if let Some(first) = p.components().next() {
-        match first {
+    let mut comp_iter = p.components();
+    let base_path = match comp_iter.next() {
+        None => return PathBuf::new(),
+        Some(c) => match c {
+            C::CurDir => cwd.into(),
+            C::ParentDir => match cwd.to_path_buf().parent() {
+                Some(pb) => pb.into(),
+                None => PathBuf::from("/"),
+            },
             C::Normal(c) => {
-                if c.to_str().unwrap() != "~" {
-                    path_buff = cwd.into();
-                }
-            }
-            C::CurDir => {
-                path_buff = cwd.into();
-            }
-            _ => (),
-        }
-    }
-    for component in p.components() {
-        match component {
-            C::CurDir => (),
-            C::ParentDir => {
-                path_buff.pop();
-            }
-            C::Normal(c) => {
-                if c.to_str().unwrap() == "~" {
-                    path_buff = home.into();
+                if c == "~" {
+                    home.into()
                 } else {
-                    path_buff.push(c);
+                    cwd.join(c)
                 }
             }
-            // TODO: Don't support this
-            C::RootDir => {
-                path_buff = PathBuf::from("/");
-            }
-            C::Prefix(_) => (),
-        }
-    }
-    return path_buff;
+            C::RootDir => PathBuf::from("/"),
+            C::Prefix(_) => PathBuf::from("/"),
+        },
+    };
+    let end_path: PathBuf = comp_iter.collect();
+    let path = base_path.join(end_path);
+    return resolve_path(path);
 }
 
 #[cfg(test)]
@@ -72,5 +106,25 @@ mod tests {
         let p = "/a";
         let expected = "/a";
         assert_eq!(normalize_path(p, home, cwd).to_str().unwrap(), expected);
+    }
+
+    #[test]
+    fn test_resolve_path() {
+        assert_eq!(resolve_path("a/b/c"), PathBuf::from("a/b/c"));
+        assert_eq!(resolve_path("a/b/.."), PathBuf::from("a"));
+        assert_eq!(resolve_path("a/b/../c"), PathBuf::from("a/c"));
+        assert_eq!(resolve_path("a/b/.././c"), PathBuf::from("a/c"));
+        assert_eq!(resolve_path("a/b/../../c"), PathBuf::from("c"));
+        assert_eq!(resolve_path("/a/b/c"), PathBuf::from("/a/b/c"));
+        assert_eq!(resolve_path("/a/b/.."), PathBuf::from("/a"));
+        assert_eq!(resolve_path("/a/b/../c"), PathBuf::from("/a/c"));
+        assert_eq!(resolve_path("/a/b/.././c"), PathBuf::from("/a/c"));
+        assert_eq!(resolve_path("/a/b/../../c"), PathBuf::from("/c"));
+        assert_eq!(resolve_path("./a/b/c"), PathBuf::from("a/b/c"));
+        assert_eq!(resolve_path("./a/b/.."), PathBuf::from("a"));
+        assert_eq!(resolve_path("./a/b/../c"), PathBuf::from("a/c"));
+        assert_eq!(resolve_path("./a/b/.././c"), PathBuf::from("a/c"));
+        assert_eq!(resolve_path("./a/b/../../c"), PathBuf::from("c"));
+        assert_eq!(resolve_path("~/a/b/../../c"), PathBuf::from("~/c"));
     }
 }

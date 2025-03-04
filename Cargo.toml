@@ -8,4 +8,5 @@ chrono = { version = "0.4.39", features = ["alloc"] }
 clap = { version = "4.5.30", features = ["derive"] }
 rstest = "0.24.0"
 serde = { version = "1.0.217", features = ["derive"] }
+thiserror = "2.0.12"
 toml = "0.8.20"
