@@ -42,5 +42,7 @@ pub enum SetupType {
 #[derive(Args, Debug, Clone)]
 pub struct AddArgs {
     pub source: PathBuf,
-    pub target: PathBuf,
+    pub project: PathBuf,
+    #[arg(short, long)]
+    pub target: Option<PathBuf>,
 }

@@ -5,41 +5,44 @@ use std::path::Path;
 use std::{env, io};
 
 use clap::Parser;
-use utils::AbsPath;
+use types::{LinkPath, ProjectPath, TargetPath};
+use utils::{normalize_path, AbsPath};
 
 mod add;
 mod cli;
 mod config;
 mod init;
 mod setup;
+mod types;
 mod utils;
 
 const HOME_ENV: &str = if cfg!(test) { "TEST_HOME" } else { "HOME" };
 const CONFIG_FILE_NAME: &str = ".dotman";
-
-fn main_add() {
-    let home = env::var(HOME_ENV).unwrap();
-    let cwd = env::current_dir().unwrap();
-    let source = utils::normalize_path("data/x/y", &home, &cwd);
-    let target = utils::normalize_path("data/f", &home, &cwd);
-    match add::add(source, target) {
-        Ok(_) => println!("Success"),
-        Err(e) => eprintln!("{}", e),
-    }
-}
 
 fn run_command(command: cli::Commands) -> Result<(), Box<dyn Error>> {
     let home = env::var(HOME_ENV).expect("Home var not set.");
     let cwd = current_dir().expect("There is a current dir.");
     match command {
         cli::Commands::Init(cmd_args) => {
-            init::init_project(&AbsPath::new(cmd_args.project).unwrap())?;
+            let project = ProjectPath::new(normalize_path(cmd_args.project, &home, &cwd))?;
+            init::init_project(&project)?;
         }
         cli::Commands::Setup(sa) => setup_project(sa.base_dir, sa.setup_type)?,
-        cli::Commands::Add(sa) => add::add(
-            utils::normalize_path(sa.source, &home, &cwd),
-            utils::normalize_path(sa.target, &home, &cwd),
-        )?,
+        cli::Commands::Add(sa) => {
+            let target = match sa.target {
+                Some(t) => t,
+                None => sa
+                    .source
+                    .file_name()
+                    .expect("source to not be an empty path")
+                    .into(),
+            };
+            let home = AbsPath::new(home)?;
+            let link = LinkPath::new(normalize_path(sa.source, &home, &cwd).strip_prefix(&home)?)?;
+            let project = ProjectPath::new(normalize_path(sa.project, &home, &cwd))?;
+            let target = TargetPath::new(target)?;
+            add::add(&home, &link, &project, &target)?;
+        }
     }
     Ok(())
 }

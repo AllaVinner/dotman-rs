@@ -1,60 +1,54 @@
+use crate::{
+    config::{self, DotConfig},
+    types::{LinkPath, ProjectPath, TargetPath},
+    utils::AbsPath,
+    CONFIG_FILE_NAME,
+};
 use std::{
-    error::Error,
-    fmt, fs, io,
+    fs, io,
     os::unix::fs as unix_fs,
     path::{Path, PathBuf},
 };
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum AddError {
-    IO(io::Error),
+    #[error("IO error while adding dotfile. Successfully rolled back changes. Error: {0}")]
+    IO(#[from] io::Error),
+    #[error(
+        "IO error while adding dotfile. Unsuccessfully rolled back changes. Original Error: {original_error}. Rollback Error: {rollback_error}"
+    )]
+    RollbackError {
+        original_error: io::Error,
+        rollback_error: io::Error,
+    },
+    #[error("source {0} not found")]
     SourceNotFound(PathBuf),
+    #[error("target {0} already exists")]
     TargetExists(PathBuf),
-    RollbackError((io::Error, io::Error)),
+    #[error("project {0} not initialized")]
+    ProjectNotInitialized(PathBuf),
+    #[error("coulnd not read dotman config: {0}")]
+    ReadConfigError(#[from] config::ReadError),
+    #[error("Could not serialize config: {0}")]
+    ConfigSerializationError(#[from] toml::ser::Error),
+    #[error("dotfile record already present in dotman config")]
+    DotfileRecordExists(PathBuf),
 }
 
-impl From<io::Error> for AddError {
-    fn from(err: io::Error) -> Self {
-        AddError::IO(err)
-    }
-}
-
-impl fmt::Display for AddError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::IO(err) => write!(f, "IO error: {}", err),
-            Self::SourceNotFound(source) => {
-                write!(f, "Source path not found: {}", source.display())
-            }
-            Self::TargetExists(target) => write!(f, "Target already exists: {}", target.display()),
-            Self::RollbackError((original_err, rollback_err)) => write!(
-                f,
-                "Rollback Error. System might not be in a valid state. Original error: {}. Rollback error: {}",
-                original_err, rollback_err
-            ),
-        }
-    }
-}
-
-impl Error for AddError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            Self::RollbackError(e) => Some(&e.0),
-            _ => None,
-        }
-    }
-}
-
-fn naive_add<S: AsRef<Path>, T: AsRef<Path>>(source: S, target: T) -> Result<(), io::Error> {
-    fs::rename(&source, &target)?;
-    unix_fs::symlink(&target, &source)?;
-    // TODO: add record stuff
+fn raw_add(
+    source: &Path,
+    full_target: &Path,
+    config_path: &Path,
+    config_content: &str,
+) -> Result<(), io::Error> {
+    fs::rename(source, full_target)?;
+    unix_fs::symlink(&full_target, &source)?;
+    fs::write(config_path, config_content)?;
     return Ok(());
 }
 
-fn rollback_add<S: AsRef<Path>, T: AsRef<Path>>(source: S, target: T) -> Result<(), io::Error> {
-    let source = source.as_ref();
-    let target = target.as_ref();
+fn rollback_add(source: &Path, target: &Path) -> Result<(), io::Error> {
     if source.exists() && source.is_symlink() {
         fs::remove_file(source)?;
     }
@@ -64,30 +58,63 @@ fn rollback_add<S: AsRef<Path>, T: AsRef<Path>>(source: S, target: T) -> Result<
     Ok(())
 }
 
-fn atomic_add<S: AsRef<Path>, T: AsRef<Path>>(source: S, target: T) -> Result<(), AddError> {
-    let source = source.as_ref();
-    let target = target.as_ref();
-    if !source.exists() {
-        return Err(AddError::SourceNotFound(source.to_path_buf()));
-    }
-    if target.exists() {
-        return Err(AddError::TargetExists(target.to_path_buf()));
-    }
-    if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    let result = naive_add(source, target);
+fn atomic_add(
+    source: &Path,
+    target: &Path,
+    config: &Path,
+    config_content: &str,
+) -> Result<(), AddError> {
+    let result = raw_add(source, target, config, config_content);
     if let Err(err) = result {
         if let Err(rollback_error) = rollback_add(source, target) {
-            return Err(AddError::RollbackError((err, rollback_error)));
+            return Err(AddError::RollbackError {
+                original_error: err,
+                rollback_error,
+            });
         }
         return Err(AddError::IO(err));
     }
     return Ok(());
 }
 
-pub fn add<S: AsRef<Path>, T: AsRef<Path>>(source: S, target: T) -> Result<(), AddError> {
-    atomic_add(source, target)
+fn add_home_dotfile(
+    home: &AbsPath,
+    link: &LinkPath,
+    project: &ProjectPath,
+    target: &TargetPath,
+) -> Result<(), AddError> {
+    let abs_source = home.join(link);
+    let abs_target = project.join(target);
+    if !abs_source.exists() {
+        return Err(AddError::SourceNotFound(abs_source));
+    }
+    if abs_target.exists() {
+        return Err(AddError::TargetExists(abs_target));
+    }
+    let abs_config = project.join(CONFIG_FILE_NAME);
+    if !abs_config.exists() {
+        return Err(AddError::ProjectNotInitialized(abs_config));
+    }
+    let mut config = DotConfig::from_file(&abs_config)?;
+    if config.dot_items.contains_key(target) {
+        return Err(AddError::DotfileRecordExists(target.to_path_buf()));
+    }
+    if let Some(parent) = abs_target.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let _ = config.dot_items.insert(target.clone(), link.clone());
+    let config_content = config.to_string()?;
+    atomic_add(&abs_source, &abs_target, &abs_config, &config_content)?;
+    Ok(())
+}
+
+pub fn add(
+    home: &AbsPath,
+    link: &LinkPath,
+    project: &ProjectPath,
+    target: &TargetPath,
+) -> Result<(), AddError> {
+    add_home_dotfile(home, link, project, target)
 }
 
 #[cfg(test)]
@@ -96,30 +123,33 @@ mod tests {
     use std::fs::create_dir;
 
     use super::*;
+    use crate::init;
     use crate::setup::setup_new_user;
     use crate::tests::root_dir;
 
     #[rstest]
     fn basic_add(root_dir: &PathBuf) {
-        let test_dir = root_dir.join("basic_add");
+        let test_dir = AbsPath::new(root_dir.join("basic_add")).unwrap();
         create_dir(&test_dir).expect("Could not create test directory.");
-        let dotfiles = test_dir.join("dotfiles");
-        let bashrc_source = test_dir.join("bashrc");
-        let bashrc_target = dotfiles.join("bashrc");
-        let nvim_source = test_dir.join("config/nvim");
-        let nvim_target = dotfiles.join("nvim");
-        setup_new_user(test_dir).expect("Could not setup folder structure.");
-        add(&bashrc_source, &bashrc_target).expect("Could not add bashrc to target.");
-        assert!(&bashrc_source.is_symlink());
-        assert!(&bashrc_target.exists());
-
-        assert!(&!nvim_source.is_symlink());
-        assert!(&nvim_source.exists());
-        assert!(&!nvim_target.exists());
-        assert!(&!nvim_target.join("init.lua").exists());
-        add(&nvim_source, &nvim_target).expect("Could not add bashrc to target.");
-        assert!(&nvim_source.is_symlink());
-        assert!(&nvim_target.exists());
-        assert!(&nvim_target.join("init.lua").exists());
+        let dotfiles = ProjectPath::new(test_dir.join("dotfiles")).unwrap();
+        let bashrc_source = LinkPath::new("bashrc").unwrap();
+        let bashrc_target = TargetPath::new("bashrc").unwrap();
+        let nvim_source = LinkPath::new("config/nvim").unwrap();
+        let nvim_target = TargetPath::new("nvim").unwrap();
+        setup_new_user(&test_dir).expect("Could not setup folder structure.");
+        init::init_project(&dotfiles).unwrap();
+        add(&test_dir, &bashrc_source, &dotfiles, &bashrc_target)
+            .expect("Could not add bashrc to target.");
+        assert!(&test_dir.join(&bashrc_source).is_symlink());
+        assert!(&dotfiles.join(&bashrc_target).exists());
+        assert!(!test_dir.join(&nvim_source).is_symlink());
+        assert!(test_dir.join(&nvim_source).exists());
+        assert!(!dotfiles.join(&nvim_target).exists());
+        assert!(!dotfiles.join(&nvim_target).join("init.lua").exists());
+        add(&test_dir, &nvim_source, &dotfiles, &nvim_target)
+            .expect("Could not add bashrc to target.");
+        assert!(test_dir.join(&nvim_source).is_symlink());
+        assert!(dotfiles.join(&nvim_target).exists());
+        assert!(dotfiles.join(&nvim_target).join("init.lua").exists());
     }
 }

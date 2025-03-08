@@ -1,63 +1,39 @@
-use std::{
-    error::Error,
-    fmt::{self, Display},
-    fs::create_dir_all,
-    io,
-};
+use crate::{config, types::ProjectPath, CONFIG_FILE_NAME};
+use std::{fs::create_dir_all, io};
+use thiserror::Error;
 
-use crate::{config, utils::AbsPath, CONFIG_FILE_NAME};
-
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum InitError {
+    #[error("project already initialized")]
     ConfigFileExists,
-    EnsureFoldersError(io::Error),
-    WriteError(config::WriteError),
+    #[error("could not ensure project folder path: {0}")]
+    EnsureFoldersError(#[from] io::Error),
+    #[error("could not write dotman config: {0}")]
+    WriteError(#[from] config::WriteError),
 }
 
-impl Error for InitError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            InitError::WriteError(e) => Some(e),
-            _ => None,
-        }
-    }
-}
-
-impl Display for InitError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::ConfigFileExists => write!(f, "Project already initialized"),
-            Self::EnsureFoldersError(e) => write!(f, "{}", e),
-            Self::WriteError(e) => write!(f, "{}", e),
-        }
-    }
-}
-
-pub fn init_project(project: &AbsPath) -> Result<(), InitError> {
+pub fn init_project(project: &ProjectPath) -> Result<(), InitError> {
     use InitError as E;
-    let project = project.as_ref();
     let config_path = project.join(CONFIG_FILE_NAME);
     if config_path.exists() {
         return Err(E::ConfigFileExists);
     }
-    create_dir_all(project).map_err(|op| E::EnsureFoldersError(op))?;
+    create_dir_all(project)?;
     let config = config::DotConfig::new();
-    config.write(&config_path).map_err(|e| E::WriteError(e))?;
+    config.write(&config_path)?;
     return Ok(());
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{fs::create_dir, path::PathBuf};
-
+    use super::*;
     use crate::tests::root_dir;
     use rstest::rstest;
-
-    use super::*;
+    use std::{fs::create_dir, path::PathBuf};
 
     #[rstest]
     fn basic_init(root_dir: &PathBuf) {
-        let test_dir = AbsPath::new(root_dir.join("basic_init")).unwrap();
+        let test_dir = ProjectPath::new(root_dir.join("basic_init")).unwrap();
         create_dir(&test_dir).expect("Could not create `test_dir`.");
         let config = test_dir.join(CONFIG_FILE_NAME);
         let _ = create_dir(&test_dir);
@@ -70,7 +46,7 @@ mod tests {
 
     #[rstest]
     fn basic_deep_init(root_dir: &PathBuf) {
-        let test_dir = AbsPath::new(root_dir.join("basic_deep_init")).unwrap();
+        let test_dir = ProjectPath::new(root_dir.join("basic_deep_init")).unwrap();
         assert!(!test_dir.exists());
         let config = test_dir.join(CONFIG_FILE_NAME);
         let _ = create_dir(&test_dir);

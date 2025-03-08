@@ -1,90 +1,54 @@
-use std::{
-    collections::BTreeMap,
-    error::Error,
-    fmt::Display,
-    fs, io,
-    path::{Path, PathBuf},
-};
+use std::{collections::BTreeMap, fs, io, path::Path};
+
+use thiserror::Error;
 
 use serde::{Deserialize, Serialize};
 use toml;
 
-type Target = PathBuf;
-type Link = PathBuf;
-type Records<K, V> = BTreeMap<K, V>;
+use crate::types::{LinkPath, TargetPath};
+
+type DotItems = BTreeMap<TargetPath, LinkPath>;
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct DotConfig {
-    records: Records<Target, Link>,
+    pub dot_items: DotItems,
 }
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum WriteError {
-    SerializationError(toml::ser::Error),
-    WriteError(io::Error),
+    #[error("Could not serialize dotfile config due to: {0}")]
+    SerializationError(#[from] toml::ser::Error),
+    #[error("Could not write dotfile config due to: {0}")]
+    WriteError(#[from] io::Error),
 }
 
-impl Display for WriteError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::SerializationError(e) => write!(f, "Could not serialize config: {}", e),
-            Self::WriteError(e) => write!(f, "{}", e),
-        }
-    }
-}
-
-impl Error for WriteError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            Self::SerializationError(e) => Some(e),
-            Self::WriteError(e) => Some(e),
-        }
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum ReadError {
-    ReadError(io::Error),
-    DeSerializationError(toml::de::Error),
-}
-
-impl Display for ReadError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::DeSerializationError(e) => write!(f, "Could not deserialize config: {}", e),
-            Self::ReadError(e) => write!(f, "{}", e),
-        }
-    }
-}
-
-impl Error for ReadError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            Self::DeSerializationError(e) => Some(e),
-            Self::ReadError(e) => Some(e),
-        }
-    }
+    #[error("Could not read dotfile config due to: {0}")]
+    ReadError(#[from] io::Error),
+    #[error("Could not deserialize dotfile config due to: {0}")]
+    DeSerializationError(#[from] toml::de::Error),
 }
 
 impl DotConfig {
     pub fn new() -> Self {
         Self {
-            records: Records::new(),
+            dot_items: DotItems::new(),
         }
+    }
+    pub fn to_string(&self) -> Result<String, toml::ser::Error> {
+        toml::to_string_pretty(self)
     }
 
     pub fn write<P: AsRef<Path>>(&self, path: P) -> Result<(), WriteError> {
-        use WriteError as E;
-        let config_str = toml::to_string_pretty(self).map_err(|e| E::SerializationError(e))?;
-        fs::write(path.as_ref(), config_str).map_err(|e| E::WriteError(e))?;
+        let config_str = self.to_string()?;
+        fs::write(path.as_ref(), config_str)?;
         return Ok(());
     }
 
     pub fn from_file<P: AsRef<Path>>(config_path: P) -> Result<Self, ReadError> {
-        use ReadError as E;
-        let toml_content = fs::read_to_string(config_path).map_err(|e| E::ReadError(e))?;
-        let config: DotConfig =
-            toml::from_str(&toml_content).map_err(|e| E::DeSerializationError(e))?;
+        let toml_content = fs::read_to_string(config_path)?;
+        let config: DotConfig = toml::from_str(&toml_content)?;
         return Ok(config);
     }
 }
@@ -96,16 +60,25 @@ mod tests {
     #[test]
     fn test_serialize() {
         let config = DotConfig {
-            records: Records::from([
-                (PathBuf::from("B"), PathBuf::from("~/a/b/c")),
-                (PathBuf::from("A"), PathBuf::from("a")),
-                (PathBuf::from("a/b"), PathBuf::from("~/a/b/")),
+            dot_items: DotItems::from([
+                (
+                    TargetPath::try_from("B").unwrap(),
+                    LinkPath::try_from("a/b/c").unwrap(),
+                ),
+                (
+                    TargetPath::try_from("A").unwrap(),
+                    LinkPath::try_from("a").unwrap(),
+                ),
+                (
+                    TargetPath::try_from("a/b").unwrap(),
+                    LinkPath::try_from("a/b").unwrap(),
+                ),
             ]),
         };
-        let expected_str = r#"[records]
-A = "a"
+        let expected_str = r#"[dot_items]
+A = "~/a"
 B = "~/a/b/c"
-"a/b" = "~/a/b/"
+"a/b" = "~/a/b"
 "#;
         let actual = toml::to_string(&config).unwrap();
         println!("{}", actual);
@@ -114,16 +87,25 @@ B = "~/a/b/c"
 
     #[test]
     fn test_deserialize() {
-        let toml_content = r#"[records]
+        let toml_content = r#"[dot_items]
 A = "a"
 B = "~/a/b/c"
 "a/b" = "~/a/b"
 "#;
         let expected_config = DotConfig {
-            records: Records::from([
-                (PathBuf::from("B"), PathBuf::from("~/a/b/c")),
-                (PathBuf::from("A"), PathBuf::from("a")),
-                (PathBuf::from("a/b"), PathBuf::from("~/a/b/")),
+            dot_items: DotItems::from([
+                (
+                    TargetPath::try_from("B").unwrap(),
+                    LinkPath::try_from("a/b/c").unwrap(),
+                ),
+                (
+                    TargetPath::try_from("A").unwrap(),
+                    LinkPath::try_from("a").unwrap(),
+                ),
+                (
+                    TargetPath::try_from("a/b").unwrap(),
+                    LinkPath::try_from("a/b").unwrap(),
+                ),
             ]),
         };
         let actual: DotConfig = toml::from_str(toml_content).unwrap();

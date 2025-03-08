@@ -1,29 +1,35 @@
 use core::fmt;
-use std::path::{Path, PathBuf};
+use std::{
+    ops::Deref,
+    path::{Path, PathBuf},
+};
 use thiserror::Error;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AbsPath(PathBuf);
 
 #[derive(Error, Debug, Clone, PartialEq)]
-#[error("{0} must be absolute")]
-pub struct AbsPathError(String);
+#[error("path is not absolute")]
+pub struct AbsPathError;
 impl AbsPath {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, AbsPathError> {
         let path = resolve_path(path);
         if path.is_absolute() {
             Ok(Self(path.into()))
         } else {
-            Err(AbsPathError(path.to_string_lossy().to_string()))
+            Err(AbsPathError)
         }
     }
 
-    pub fn join<P: AsRef<Path>>(&self, path: P) -> Self {
+    pub fn join_abs<P: AsRef<Path>>(&self, path: P) -> Self {
         Self(resolve_path(self.0.join(path)))
     }
+}
 
-    pub fn exists(&self) -> bool {
-        self.0.exists()
+impl Deref for AbsPath {
+    type Target = PathBuf;
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -33,16 +39,56 @@ impl AsRef<Path> for AbsPath {
     }
 }
 
-impl fmt::Display for AbsPath {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0.display())
+impl AsRef<PathBuf> for AbsPath {
+    fn as_ref(&self) -> &PathBuf {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RelPath(PathBuf);
+
+#[derive(Error, Debug, Clone, PartialEq)]
+#[error("path is not relative")]
+pub struct RelPathError;
+impl RelPath {
+    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, RelPathError> {
+        let path = resolve_path(path);
+        if path.is_absolute() {
+            Err(RelPathError)
+        } else {
+            Ok(Self(path.into()))
+        }
+    }
+
+    pub fn join(&self, path: &RelPath) -> Self {
+        Self(resolve_path(self.0.join(path)))
+    }
+}
+
+impl Deref for RelPath {
+    type Target = PathBuf;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl AsRef<Path> for RelPath {
+    fn as_ref(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl AsRef<PathBuf> for RelPath {
+    fn as_ref(&self) -> &PathBuf {
+        &self.0
     }
 }
 
 pub fn resolve_path<P: AsRef<Path>>(path: P) -> PathBuf {
+    use std::path::Component as C;
     let path = path.as_ref();
     let mut path_buff = PathBuf::new();
-    use std::path::Component as C;
     for component in path.components() {
         match component {
             C::CurDir => (),
