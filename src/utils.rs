@@ -19,10 +19,6 @@ impl AbsPath {
             Err(AbsPathError)
         }
     }
-
-    pub fn join_abs<P: AsRef<Path>>(&self, path: P) -> Self {
-        Self(resolve_path(self.0.join(path)))
-    }
 }
 
 impl Deref for AbsPath {
@@ -58,10 +54,6 @@ impl RelPath {
         } else {
             Ok(Self(path.into()))
         }
-    }
-
-    pub fn join(&self, path: &RelPath) -> Self {
-        Self(resolve_path(self.0.join(path)))
     }
 }
 

@@ -57,7 +57,6 @@ fn rollback_add(source: &Path, target: &Path) -> Result<(), io::Error> {
     }
     Ok(())
 }
-
 fn atomic_add(
     source: &Path,
     target: &Path,

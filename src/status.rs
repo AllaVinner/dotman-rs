@@ -1,13 +1,12 @@
-use std::{collections::BTreeMap, fs};
+use std::fs;
 
 use crate::{
     config::{self, DotConfig},
-    types::{ProjectPath, SourcePath},
+    types::ProjectPath,
     utils::AbsPath,
     CONFIG_FILE_NAME,
 };
 
-type StatusSummary = BTreeMap<SourcePath, String>;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
