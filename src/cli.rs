@@ -17,6 +17,7 @@ pub enum Commands {
     Setup(SetupArgs),
     Add(AddArgs),
     Restore(RestoreArgs),
+    Status(StatusArgs),
 }
 
 #[derive(Args, Debug, Clone)]
@@ -55,4 +56,10 @@ pub struct RestoreArgs {
     pub project: PathBuf,
     #[arg(short, long)]
     pub dotfile: Option<PathBuf>,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct StatusArgs {
+    #[arg(default_value = ".")]
+    pub project: PathBuf,
 }

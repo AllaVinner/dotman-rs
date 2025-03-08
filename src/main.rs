@@ -14,6 +14,7 @@ mod config;
 mod init;
 mod restore;
 mod setup;
+mod status;
 mod types;
 mod utils;
 
@@ -54,6 +55,11 @@ fn run_command(command: cli::Commands) -> Result<(), Box<dyn Error>> {
                     restore::restore_dotfile(&project, &dotfile, &home)?;
                 }
             }
+        }
+        cli::Commands::Status(args) => {
+            let home = AbsPath::new(home)?;
+            let project = ProjectPath::new(normalize_path(args.project, &home, &cwd))?;
+            status::project_summary(&project, &home)?;
         }
     }
     Ok(())
