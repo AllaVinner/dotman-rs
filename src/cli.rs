@@ -18,6 +18,7 @@ pub enum Commands {
     Add(AddArgs),
     Restore(RestoreArgs),
     Status(StatusArgs),
+    Link(LinkArgs),
 }
 
 #[derive(Args, Debug, Clone)]
@@ -40,6 +41,7 @@ pub struct SetupArgs {
 pub enum SetupType {
     NewUser,
     NewMachine,
+    NewDotfile,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -60,6 +62,14 @@ pub struct RestoreArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct StatusArgs {
+    #[arg(default_value = ".")]
+    pub project: PathBuf,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct LinkArgs {
+    pub dotfile: PathBuf,
+    pub link: PathBuf,
     #[arg(default_value = ".")]
     pub project: PathBuf,
 }

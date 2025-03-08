@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use std::env::current_dir;
 use std::error::Error;
 use std::path::Path;
@@ -12,6 +11,7 @@ mod add;
 mod cli;
 mod config;
 mod init;
+mod link;
 mod restore;
 mod setup;
 mod status;
@@ -61,6 +61,13 @@ fn run_command(command: cli::Commands) -> Result<(), Box<dyn Error>> {
             let project = ProjectPath::new(normalize_path(args.project, &home, &cwd))?;
             status::project_summary(&project, &home)?;
         }
+        cli::Commands::Link(args) => {
+            let home = AbsPath::new(home)?;
+            let link = LinkPath::new(normalize_path(args.link, &home, &cwd).strip_prefix(&home)?)?;
+            let dotfile = SourcePath::new(args.dotfile)?;
+            let project = ProjectPath::new(normalize_path(args.project, &home, &cwd))?;
+            link::link(&home, &link, &dotfile, &project)?;
+        }
     }
     Ok(())
 }
@@ -69,6 +76,7 @@ fn setup_project<P: AsRef<Path>>(base_dir: P, setup_type: cli::SetupType) -> Res
     match setup_type {
         cli::SetupType::NewUser => setup::setup_new_user(base_dir)?,
         cli::SetupType::NewMachine => setup::setup_new_machine(base_dir)?,
+        cli::SetupType::NewDotfile => setup::setup_new_dotfile(base_dir)?,
     }
     Ok(())
 }

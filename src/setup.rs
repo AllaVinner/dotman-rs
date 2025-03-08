@@ -90,3 +90,23 @@ pub fn setup_new_machine_from_structure(f: &SetupStructure) -> io::Result<()> {
     fs::remove_dir_all(&f.home.join(&f.nvim.link).parent().unwrap())?;
     Ok(())
 }
+
+pub fn setup_new_dotfile_from_structure(f: &SetupStructure) -> io::Result<()> {
+    setup_new_user_from_structure(f)?;
+    init::init_project(&f.dotfiles).expect("A");
+    fs::rename(&f.home.join(&f.nvim.link), &f.dotfiles.join(&f.nvim.source))?;
+    fs::rename(
+        &f.home.join(&f.bashrc.link),
+        &f.dotfiles.join(&f.bashrc.source),
+    )?;
+    Ok(())
+}
+
+pub fn setup_new_dotfile<P: AsRef<Path>>(base_dir: P) -> io::Result<()> {
+    let base_dir = base_dir.as_ref();
+    let home = AbsPath::new(env::var(HOME_ENV).expect("Home var not set.")).expect("");
+    let cwd = current_dir().expect("There is a current dir.");
+    let f = get_setup_structure(base_dir, &home, &cwd);
+    setup_new_dotfile_from_structure(&f)?;
+    Ok(())
+}
