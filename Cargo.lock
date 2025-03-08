@@ -190,7 +190,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "dotman-rs"
+name = "dotman"
 version = "0.1.0"
 dependencies = [
  "chrono",
