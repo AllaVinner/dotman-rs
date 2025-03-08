@@ -96,13 +96,13 @@ fn add_home_dotfile(
         return Err(AddError::ProjectNotInitialized(abs_config));
     }
     let mut config = DotConfig::from_file(&abs_config)?;
-    if config.dot_items.contains_key(target) {
+    if config.dotfiles.contains_key(target) {
         return Err(AddError::DotfileRecordExists(target.to_path_buf()));
     }
     if let Some(parent) = abs_target.parent() {
         fs::create_dir_all(parent)?;
     }
-    let _ = config.dot_items.insert(target.clone(), link.clone());
+    let _ = config.dotfiles.insert(target.clone(), link.clone());
     let config_content = config.to_string()?;
     atomic_add(&abs_source, &abs_target, &abs_config, &config_content)?;
     Ok(())

@@ -11,7 +11,7 @@ type DotItems = BTreeMap<TargetPath, LinkPath>;
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct DotConfig {
-    pub dot_items: DotItems,
+    pub dotfiles: DotItems,
 }
 
 #[derive(Error, Debug)]
@@ -33,7 +33,7 @@ pub enum ReadError {
 impl DotConfig {
     pub fn new() -> Self {
         Self {
-            dot_items: DotItems::new(),
+            dotfiles: DotItems::new(),
         }
     }
     pub fn to_string(&self) -> Result<String, toml::ser::Error> {
@@ -60,7 +60,7 @@ mod tests {
     #[test]
     fn test_serialize() {
         let config = DotConfig {
-            dot_items: DotItems::from([
+            dotfiles: DotItems::from([
                 (
                     TargetPath::try_from("B").unwrap(),
                     LinkPath::try_from("a/b/c").unwrap(),
@@ -75,7 +75,7 @@ mod tests {
                 ),
             ]),
         };
-        let expected_str = r#"[dot_items]
+        let expected_str = r#"[dotfiles]
 A = "~/a"
 B = "~/a/b/c"
 "a/b" = "~/a/b"
@@ -87,13 +87,13 @@ B = "~/a/b/c"
 
     #[test]
     fn test_deserialize() {
-        let toml_content = r#"[dot_items]
+        let toml_content = r#"[dotfiles]
 A = "a"
 B = "~/a/b/c"
 "a/b" = "~/a/b"
 "#;
         let expected_config = DotConfig {
-            dot_items: DotItems::from([
+            dotfiles: DotItems::from([
                 (
                     TargetPath::try_from("B").unwrap(),
                     LinkPath::try_from("a/b/c").unwrap(),
