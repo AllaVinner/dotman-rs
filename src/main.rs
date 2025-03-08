@@ -5,13 +5,14 @@ use std::path::Path;
 use std::{env, io};
 
 use clap::Parser;
-use types::{LinkPath, ProjectPath, TargetPath};
+use types::{LinkPath, ProjectPath, SourcePath};
 use utils::{normalize_path, AbsPath};
 
 mod add;
 mod cli;
 mod config;
 mod init;
+mod restore;
 mod setup;
 mod types;
 mod utils;
@@ -40,7 +41,7 @@ fn run_command(command: cli::Commands) -> Result<(), Box<dyn Error>> {
             let home = AbsPath::new(home)?;
             let link = LinkPath::new(normalize_path(sa.source, &home, &cwd).strip_prefix(&home)?)?;
             let project = ProjectPath::new(normalize_path(sa.project, &home, &cwd))?;
-            let target = TargetPath::new(target)?;
+            let target = SourcePath::new(target)?;
             add::add(&home, &link, &project, &target)?;
         }
     }

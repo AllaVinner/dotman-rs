@@ -1,6 +1,6 @@
 use crate::{
     config::{self, DotConfig},
-    types::{LinkPath, ProjectPath, TargetPath},
+    types::{LinkPath, ProjectPath, SourcePath},
     utils::AbsPath,
     CONFIG_FILE_NAME,
 };
@@ -81,7 +81,7 @@ fn add_home_dotfile(
     home: &AbsPath,
     link: &LinkPath,
     project: &ProjectPath,
-    target: &TargetPath,
+    target: &SourcePath,
 ) -> Result<(), AddError> {
     let abs_source = home.join(link);
     let abs_target = project.join(target);
@@ -112,7 +112,7 @@ pub fn add(
     home: &AbsPath,
     link: &LinkPath,
     project: &ProjectPath,
-    target: &TargetPath,
+    target: &SourcePath,
 ) -> Result<(), AddError> {
     add_home_dotfile(home, link, project, target)
 }
@@ -133,9 +133,9 @@ mod tests {
         create_dir(&test_dir).expect("Could not create test directory.");
         let dotfiles = ProjectPath::new(test_dir.join("dotfiles")).unwrap();
         let bashrc_source = LinkPath::new("bashrc").unwrap();
-        let bashrc_target = TargetPath::new("bashrc").unwrap();
+        let bashrc_target = SourcePath::new("bashrc").unwrap();
         let nvim_source = LinkPath::new("config/nvim").unwrap();
-        let nvim_target = TargetPath::new("nvim").unwrap();
+        let nvim_target = SourcePath::new("nvim").unwrap();
         setup_new_user(&test_dir).expect("Could not setup folder structure.");
         init::init_project(&dotfiles).unwrap();
         add(&test_dir, &bashrc_source, &dotfiles, &bashrc_target)

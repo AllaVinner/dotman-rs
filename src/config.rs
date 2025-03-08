@@ -5,9 +5,9 @@ use thiserror::Error;
 use serde::{Deserialize, Serialize};
 use toml;
 
-use crate::types::{LinkPath, TargetPath};
+use crate::types::{LinkPath, SourcePath};
 
-type DotItems = BTreeMap<TargetPath, LinkPath>;
+type DotItems = BTreeMap<SourcePath, LinkPath>;
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct DotConfig {
@@ -62,15 +62,15 @@ mod tests {
         let config = DotConfig {
             dotfiles: DotItems::from([
                 (
-                    TargetPath::try_from("B").unwrap(),
+                    SourcePath::try_from("B").unwrap(),
                     LinkPath::try_from("a/b/c").unwrap(),
                 ),
                 (
-                    TargetPath::try_from("A").unwrap(),
+                    SourcePath::try_from("A").unwrap(),
                     LinkPath::try_from("a").unwrap(),
                 ),
                 (
-                    TargetPath::try_from("a/b").unwrap(),
+                    SourcePath::try_from("a/b").unwrap(),
                     LinkPath::try_from("a/b").unwrap(),
                 ),
             ]),
@@ -95,15 +95,15 @@ B = "~/a/b/c"
         let expected_config = DotConfig {
             dotfiles: DotItems::from([
                 (
-                    TargetPath::try_from("B").unwrap(),
+                    SourcePath::try_from("B").unwrap(),
                     LinkPath::try_from("a/b/c").unwrap(),
                 ),
                 (
-                    TargetPath::try_from("A").unwrap(),
+                    SourcePath::try_from("A").unwrap(),
                     LinkPath::try_from("a").unwrap(),
                 ),
                 (
-                    TargetPath::try_from("a/b").unwrap(),
+                    SourcePath::try_from("a/b").unwrap(),
                     LinkPath::try_from("a/b").unwrap(),
                 ),
             ]),
