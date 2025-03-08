@@ -124,7 +124,7 @@ mod tests {
 
     use super::*;
     use crate::init;
-    use crate::setup::{get_setup_structure, setup_new_user, setup_new_user_from_structure};
+    use crate::setup::{get_setup_structure, setup_new_user_from_structure};
     use crate::tests::root_dir;
 
     #[rstest]

@@ -1,8 +1,8 @@
-use std::{collections::BTreeMap, fs, io};
+use std::{collections::BTreeMap, fs};
 
 use crate::{
     config::{self, DotConfig},
-    types::{LinkPath, ProjectPath, SourcePath},
+    types::{ProjectPath, SourcePath},
     utils::AbsPath,
     CONFIG_FILE_NAME,
 };

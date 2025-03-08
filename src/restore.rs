@@ -98,7 +98,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        setup::{get_setup_structure, setup_new_machine, setup_new_machine_from_structure},
+        setup::{get_setup_structure, setup_new_machine_from_structure},
         tests::root_dir,
     };
     use rstest::rstest;
