@@ -19,7 +19,7 @@ mod types;
 mod utils;
 
 const HOME_ENV: &str = if cfg!(test) { "TEST_HOME" } else { "HOME" };
-const CONFIG_FILE_NAME: &str = ".dotman";
+const CONFIG_FILE_NAME: &str = ".dotman.toml";
 
 fn run_command(command: cli::Commands) -> Result<(), Box<dyn Error>> {
     let home = env::var(HOME_ENV).expect("Home var not set.");
