@@ -124,32 +124,29 @@ mod tests {
 
     use super::*;
     use crate::init;
-    use crate::setup::setup_new_user;
+    use crate::setup::{get_setup_structure, setup_new_user, setup_new_user_from_structure};
     use crate::tests::root_dir;
 
     #[rstest]
     fn basic_add(root_dir: &PathBuf) {
         let test_dir = AbsPath::new(root_dir.join("basic_add")).unwrap();
         create_dir(&test_dir).expect("Could not create test directory.");
-        let dotfiles = ProjectPath::new(test_dir.join("dotfiles")).unwrap();
-        let bashrc_source = LinkPath::new("bashrc").unwrap();
-        let bashrc_target = SourcePath::new("bashrc").unwrap();
-        let nvim_source = LinkPath::new("config/nvim").unwrap();
-        let nvim_target = SourcePath::new("nvim").unwrap();
-        setup_new_user(&test_dir).expect("Could not setup folder structure.");
-        init::init_project(&dotfiles).unwrap();
-        add(&test_dir, &bashrc_source, &dotfiles, &bashrc_target)
+        let f = get_setup_structure(&test_dir, &test_dir, &test_dir);
+        setup_new_user_from_structure(&f).expect("Could not setup folder structure.");
+        init::init_project(&f.dotfiles).unwrap();
+        dbg!(&f);
+        add(&f.home, &f.bashrc.link, &f.dotfiles, &f.bashrc.source)
             .expect("Could not add bashrc to target.");
-        assert!(&test_dir.join(&bashrc_source).is_symlink());
-        assert!(&dotfiles.join(&bashrc_target).exists());
-        assert!(!test_dir.join(&nvim_source).is_symlink());
-        assert!(test_dir.join(&nvim_source).exists());
-        assert!(!dotfiles.join(&nvim_target).exists());
-        assert!(!dotfiles.join(&nvim_target).join("init.lua").exists());
-        add(&test_dir, &nvim_source, &dotfiles, &nvim_target)
+        assert!(&f.home.join(&f.bashrc.link).is_symlink());
+        assert!(&f.dotfiles.join(&f.bashrc.source).exists());
+        assert!(!f.home.join(&f.nvim.link).is_symlink());
+        assert!(f.home.join(&f.nvim.link).exists());
+        assert!(!f.dotfiles.join(&f.nvim.source).exists());
+        assert!(!f.dotfiles.join(&f.nvim.source).join("init.lua").exists());
+        add(&test_dir, &f.nvim.link, &f.dotfiles, &f.nvim.source)
             .expect("Could not add bashrc to target.");
-        assert!(test_dir.join(&nvim_source).is_symlink());
-        assert!(dotfiles.join(&nvim_target).exists());
-        assert!(dotfiles.join(&nvim_target).join("init.lua").exists());
+        assert!(f.home.join(&f.nvim.link).is_symlink());
+        assert!(f.dotfiles.join(&f.nvim.source).exists());
+        assert!(f.dotfiles.join(&f.nvim.source).join("init.lua").exists());
     }
 }

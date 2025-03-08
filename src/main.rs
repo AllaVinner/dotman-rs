@@ -44,6 +44,17 @@ fn run_command(command: cli::Commands) -> Result<(), Box<dyn Error>> {
             let target = SourcePath::new(target)?;
             add::add(&home, &link, &project, &target)?;
         }
+        cli::Commands::Restore(args) => {
+            let home = AbsPath::new(home)?;
+            let project = ProjectPath::new(normalize_path(args.project, &home, &cwd))?;
+            match args.dotfile {
+                None => restore::restore_project(&project, &home)?,
+                Some(d) => {
+                    let dotfile = SourcePath::new(d)?;
+                    restore::restore_dotfile(&project, &dotfile, &home)?;
+                }
+            }
+        }
     }
     Ok(())
 }
@@ -51,6 +62,7 @@ fn run_command(command: cli::Commands) -> Result<(), Box<dyn Error>> {
 fn setup_project<P: AsRef<Path>>(base_dir: P, setup_type: cli::SetupType) -> Result<(), io::Error> {
     match setup_type {
         cli::SetupType::NewUser => setup::setup_new_user(base_dir)?,
+        cli::SetupType::NewMachine => setup::setup_new_machine(base_dir)?,
     }
     Ok(())
 }
