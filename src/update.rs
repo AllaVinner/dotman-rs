@@ -10,7 +10,7 @@ use crate::{
 };
 
 #[derive(Error, Debug)]
-pub enum LinkError {
+pub enum UpdateError {
     #[error("project not initialized")]
     ProjectNotInitialized,
     #[error("dotfile not found")]
@@ -32,7 +32,7 @@ pub enum LinkError {
     },
 }
 
-fn raw_link(
+fn raw_update(
     link: &Path,
     full_source: &Path,
     config_path: &Path,
@@ -43,39 +43,39 @@ fn raw_link(
     return Ok(());
 }
 
-fn rollback_link(link: &Path) -> Result<(), io::Error> {
+fn rollback_update(link: &Path) -> Result<(), io::Error> {
     if link.exists() && link.is_symlink() {
         fs::remove_file(link)?;
     }
     Ok(())
 }
 
-fn atomic_link(
+fn atomic_update(
     link: &Path,
     source: &Path,
     config: &Path,
     config_content: &str,
-) -> Result<(), LinkError> {
-    let result = raw_link(link, source, config, config_content);
+) -> Result<(), UpdateError> {
+    let result = raw_update(link, source, config, config_content);
     if let Err(err) = result {
-        if let Err(rollback_error) = rollback_link(link) {
-            return Err(LinkError::RollbackError {
+        if let Err(rollback_error) = rollback_update(link) {
+            return Err(UpdateError::RollbackError {
                 original_error: err,
                 rollback_error,
             });
         }
-        return Err(LinkError::IO(err));
+        return Err(UpdateError::IO(err));
     }
     return Ok(());
 }
 
-pub fn link(
+pub fn update(
     home: &AbsPath,
     link: &LinkPath,
     source: &SourcePath,
     project: &ProjectPath,
-) -> Result<(), LinkError> {
-    use LinkError as E;
+) -> Result<(), UpdateError> {
+    use UpdateError as E;
     let config_path = project.join(CONFIG_FILE_NAME);
     if !config_path.exists() {
         return Err(E::ProjectNotInitialized);
@@ -91,6 +91,6 @@ pub fn link(
     let mut config = DotConfig::from_file(&config_path)?;
     let _ = config.dotfiles.insert(source.clone(), link.clone());
     let config_content = config.to_string()?;
-    atomic_link(&abs_link, &abs_source, &config_path, &config_content)?;
+    atomic_update(&abs_link, &abs_source, &config_path, &config_content)?;
     Ok(())
 }

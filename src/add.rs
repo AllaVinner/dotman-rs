@@ -122,16 +122,16 @@ mod tests {
     use std::fs::create_dir;
 
     use super::*;
+    use crate::example::{example_new_user_from_structure, get_example_structure};
     use crate::init;
-    use crate::setup::{get_setup_structure, setup_new_user_from_structure};
     use crate::tests::root_dir;
 
     #[rstest]
     fn basic_add(root_dir: &PathBuf) {
         let test_dir = AbsPath::new(root_dir.join("basic_add")).unwrap();
         create_dir(&test_dir).expect("Could not create test directory.");
-        let f = get_setup_structure(&test_dir, &test_dir, &test_dir);
-        setup_new_user_from_structure(&f).expect("Could not setup folder structure.");
+        let f = get_example_structure(&test_dir, &test_dir, &test_dir);
+        example_new_user_from_structure(&f).expect("Could not setup folder structure.");
         init::init_project(&f.dotfiles).unwrap();
         dbg!(&f);
         add(&f.home, &f.bashrc.link, &f.dotfiles, &f.bashrc.source)

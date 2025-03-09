@@ -10,12 +10,12 @@ use utils::{normalize_path, AbsPath};
 mod add;
 mod cli;
 mod config;
+mod example;
 mod init;
-mod link;
-mod restore;
 mod setup;
 mod status;
 mod types;
+mod update;
 mod utils;
 
 const HOME_ENV: &str = if cfg!(test) { "TEST_HOME" } else { "HOME" };
@@ -29,7 +29,7 @@ fn run_command(command: cli::Commands) -> Result<(), Box<dyn Error>> {
             let project = ProjectPath::new(normalize_path(cmd_args.project, &home, &cwd))?;
             init::init_project(&project)?;
         }
-        cli::Commands::Setup(sa) => setup_project(sa.base_dir, sa.setup_type)?,
+        cli::Commands::Example(sa) => setup_project(sa.base_dir, sa.example)?,
         cli::Commands::Add(sa) => {
             let target = match sa.target {
                 Some(t) => t,
@@ -45,14 +45,14 @@ fn run_command(command: cli::Commands) -> Result<(), Box<dyn Error>> {
             let target = SourcePath::new(target)?;
             add::add(&home, &link, &project, &target)?;
         }
-        cli::Commands::Restore(args) => {
+        cli::Commands::Setup(args) => {
             let home = AbsPath::new(home)?;
             let project = ProjectPath::new(normalize_path(args.project, &home, &cwd))?;
             match args.dotfile {
-                None => restore::restore_project(&project, &home)?,
+                None => setup::setup_project(&project, &home)?,
                 Some(d) => {
                     let dotfile = SourcePath::new(d)?;
-                    restore::restore_dotfile(&project, &dotfile, &home)?;
+                    setup::setup_dotfile(&project, &dotfile, &home)?;
                 }
             }
         }
@@ -61,22 +61,22 @@ fn run_command(command: cli::Commands) -> Result<(), Box<dyn Error>> {
             let project = ProjectPath::new(normalize_path(args.project, &home, &cwd))?;
             status::project_summary(&project, &home)?;
         }
-        cli::Commands::Link(args) => {
+        cli::Commands::Update(args) => {
             let home = AbsPath::new(home)?;
             let link = LinkPath::new(normalize_path(args.link, &home, &cwd).strip_prefix(&home)?)?;
             let dotfile = SourcePath::new(args.dotfile)?;
             let project = ProjectPath::new(normalize_path(args.project, &home, &cwd))?;
-            link::link(&home, &link, &dotfile, &project)?;
+            update::update(&home, &link, &dotfile, &project)?;
         }
     }
     Ok(())
 }
 
-fn setup_project<P: AsRef<Path>>(base_dir: P, setup_type: cli::SetupType) -> Result<(), io::Error> {
+fn setup_project<P: AsRef<Path>>(base_dir: P, setup_type: cli::Examples) -> Result<(), io::Error> {
     match setup_type {
-        cli::SetupType::NewUser => setup::setup_new_user(base_dir)?,
-        cli::SetupType::NewMachine => setup::setup_new_machine(base_dir)?,
-        cli::SetupType::NewDotfile => setup::setup_new_dotfile(base_dir)?,
+        cli::Examples::NewUser => example::example_new_user(base_dir)?,
+        cli::Examples::NewMachine => example::example_new_machine(base_dir)?,
+        cli::Examples::NewDotfile => example::example_new_dotfile(base_dir)?,
     }
     Ok(())
 }

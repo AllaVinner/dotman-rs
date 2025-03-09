@@ -14,11 +14,11 @@ pub enum Commands {
     /// Initiate project
     Init(InitArgs),
     /// Setup example directories
-    Setup(SetupArgs),
+    Example(ExampleArgs),
     Add(AddArgs),
-    Restore(RestoreArgs),
+    Setup(SetupArgs),
     Status(StatusArgs),
-    Link(LinkArgs),
+    Update(UpdateArgs),
 }
 
 #[derive(Args, Debug, Clone)]
@@ -29,16 +29,16 @@ pub struct InitArgs {
 }
 
 #[derive(Args, Debug, Clone)]
-pub struct SetupArgs {
+pub struct ExampleArgs {
     /// Setup for main
-    pub setup_type: SetupType,
+    pub example: Examples,
     /// Base Directory
     #[arg(default_value = ".")]
     pub base_dir: PathBuf,
 }
 
 #[derive(ValueEnum, Debug, Clone, Copy)]
-pub enum SetupType {
+pub enum Examples {
     NewUser,
     NewMachine,
     NewDotfile,
@@ -53,7 +53,7 @@ pub struct AddArgs {
 }
 
 #[derive(Args, Debug, Clone)]
-pub struct RestoreArgs {
+pub struct SetupArgs {
     #[arg(default_value = ".")]
     pub project: PathBuf,
     #[arg(short, long)]
@@ -67,7 +67,7 @@ pub struct StatusArgs {
 }
 
 #[derive(Args, Debug, Clone)]
-pub struct LinkArgs {
+pub struct UpdateArgs {
     pub dotfile: PathBuf,
     pub link: PathBuf,
     #[arg(default_value = ".")]

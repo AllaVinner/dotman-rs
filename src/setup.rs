@@ -1,112 +1,122 @@
-use std::fs::{self, create_dir_all};
-use std::{
-    env::{self, current_dir},
-    io,
-    path::Path,
-};
+use std::{fs, io, os::unix::fs as unix_fs, path::Path};
 
 use crate::{
-    add, init,
-    types::{LinkPath, ProjectPath, SourcePath},
-    utils::{normalize_path, AbsPath},
-    HOME_ENV,
+    config::{DotConfig, ReadError},
+    types::{ProjectPath, SourcePath},
+    utils::AbsPath,
+    CONFIG_FILE_NAME,
 };
+use thiserror::Error;
 
-#[derive(Debug)]
-pub struct SetupDotfile {
-    pub link: LinkPath,
-    pub source: SourcePath,
+#[derive(Error, Debug)]
+pub enum SetupError {
+    #[error("project not initialized")]
+    ProjectNotInitialized,
+    #[error("could not find dotfile")]
+    DotfileNotFound,
+    #[error("could not read project config")]
+    ConfigReadError(#[from] ReadError),
+    #[error("dotfile not recorded in config")]
+    DotfileNotRecorded,
+    #[error("link path is already occupied")]
+    LinkOccupied,
+    #[error("error while restoring source: {0}")]
+    SetupError(#[from] io::Error),
 }
 
-#[derive(Debug)]
-pub struct SetupStructure {
-    pub home: AbsPath,
-    pub dotfiles: ProjectPath,
-    pub nvim: SetupDotfile,
-    pub bashrc: SetupDotfile,
-}
-
-pub fn get_setup_structure<P: AsRef<Path>, H: AsRef<Path>, W: AsRef<Path>>(
-    base_dir: P,
-    home: H,
-    cwd: W,
-) -> SetupStructure {
-    let base_dir = AbsPath::new(normalize_path(base_dir, &home, &cwd)).expect("");
-    let home = AbsPath::new(home).expect("");
-    let project = ProjectPath::new(base_dir.join("dotfiles")).expect("");
-    let bashrc_link =
-        LinkPath::new(base_dir.join("bashrc").strip_prefix(&home).unwrap()).expect("");
-    let bashrc_source = SourcePath::new("bashrc").expect("");
-    let nvim_link =
-        LinkPath::new(base_dir.join("config/nvim").strip_prefix(&home).unwrap()).expect("");
-    let nvim_source = SourcePath::new("nvim").expect("");
-    SetupStructure {
-        home,
-        dotfiles: project,
-        nvim: SetupDotfile {
-            link: nvim_link,
-            source: nvim_source,
-        },
-        bashrc: SetupDotfile {
-            link: bashrc_link,
-            source: bashrc_source,
-        },
+fn atomic_setup(link_source: &Path, link_target: &Path) -> Result<(), io::Error> {
+    if let Some(parent) = link_source.parent() {
+        fs::create_dir_all(parent)?;
     }
-}
-
-pub fn setup_new_user<P: AsRef<Path>>(base_dir: P) -> io::Result<()> {
-    let home = AbsPath::new(env::var(HOME_ENV).expect("Home var not set.")).expect("");
-    let cwd = current_dir().expect("There is a current dir.");
-    let f = get_setup_structure(base_dir, &home, &cwd);
-    setup_new_user_from_structure(&f)
-}
-
-pub fn setup_new_user_from_structure(f: &SetupStructure) -> io::Result<()> {
-    create_dir_all(&f.dotfiles)?;
-    create_dir_all(&f.home.join(&f.nvim.link))?;
-    fs::write(&f.home.join(&f.bashrc.link), "basrc content")?;
-    fs::write(
-        &f.home.join(&f.nvim.link).join("init.lua"),
-        "init dot lua content",
-    )?;
+    unix_fs::symlink(&link_target, &link_source)?;
     Ok(())
 }
 
-pub fn setup_new_machine<P: AsRef<Path>>(base_dir: P) -> io::Result<()> {
-    let base_dir = base_dir.as_ref();
-    let home = AbsPath::new(env::var(HOME_ENV).expect("Home var not set.")).expect("");
-    let cwd = current_dir().expect("There is a current dir.");
-    let f = get_setup_structure(base_dir, &home, &cwd);
-    setup_new_machine_from_structure(&f)?;
+fn setup_source(
+    project: &ProjectPath,
+    source: &SourcePath,
+    home: &AbsPath,
+) -> Result<(), SetupError> {
+    use SetupError as E;
+    let config_path = project.join(CONFIG_FILE_NAME);
+    if !config_path.exists() {
+        return Err(E::ProjectNotInitialized);
+    }
+    let abs_source = project.join(source);
+    if !abs_source.exists() {
+        return Err(E::DotfileNotFound);
+    }
+    let config = DotConfig::from_file(config_path)?;
+    let link = match config.dotfiles.get(source) {
+        Some(v) => v,
+        None => return Err(E::DotfileNotRecorded),
+    };
+    let abs_link = home.join(link);
+    if abs_link.is_symlink() || abs_link.exists() {
+        return Err(E::LinkOccupied);
+    }
+    atomic_setup(&abs_link, &abs_source)?;
     Ok(())
 }
 
-pub fn setup_new_machine_from_structure(f: &SetupStructure) -> io::Result<()> {
-    setup_new_user_from_structure(f)?;
-    init::init_project(&f.dotfiles).expect("A");
-    add::add(&f.home, &f.bashrc.link, &f.dotfiles, &f.bashrc.source).expect("B");
-    add::add(&f.home, &f.nvim.link, &f.dotfiles, &f.nvim.source).expect("C");
-    fs::remove_file(&f.home.join(&f.bashrc.link))?;
-    fs::remove_dir_all(&f.home.join(&f.nvim.link).parent().unwrap())?;
+pub fn setup_project(project: &ProjectPath, home: &AbsPath) -> Result<(), SetupError> {
+    use SetupError as E;
+    let config_path = project.join(CONFIG_FILE_NAME);
+    if !config_path.exists() {
+        return Err(E::ProjectNotInitialized);
+    }
+    let config = DotConfig::from_file(config_path)?;
+    for (source, link) in config.dotfiles.iter() {
+        let abs_link = home.join(link);
+        let abs_source = project.join(source);
+        if !abs_source.exists() {
+            return Err(E::DotfileNotFound);
+        }
+        if abs_link.is_symlink() || abs_link.exists() {
+            return Err(E::LinkOccupied);
+        }
+    }
+    for (source, link) in config.dotfiles.iter() {
+        let abs_link = home.join(link);
+        let abs_source = project.join(source);
+        atomic_setup(&abs_link, &abs_source)?;
+    }
     Ok(())
 }
 
-pub fn setup_new_dotfile_from_structure(f: &SetupStructure) -> io::Result<()> {
-    setup_new_user_from_structure(f)?;
-    init::init_project(&f.dotfiles).expect("A");
-    fs::rename(&f.home.join(&f.nvim.link), &f.dotfiles.join(&f.nvim.source))?;
-    fs::rename(
-        &f.home.join(&f.bashrc.link),
-        &f.dotfiles.join(&f.bashrc.source),
-    )?;
-    Ok(())
+pub fn setup_dotfile(
+    project: &ProjectPath,
+    source: &SourcePath,
+    home: &AbsPath,
+) -> Result<(), SetupError> {
+    setup_source(project, source, home)
 }
 
-pub fn setup_new_dotfile<P: AsRef<Path>>(base_dir: P) -> io::Result<()> {
-    let base_dir = base_dir.as_ref();
-    let home = AbsPath::new(env::var(HOME_ENV).expect("Home var not set.")).expect("");
-    let cwd = current_dir().expect("There is a current dir.");
-    let f = get_setup_structure(base_dir, &home, &cwd);
-    setup_new_dotfile_from_structure(&f)?;
-    Ok(())
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::*;
+    use crate::{
+        example::{example_new_machine_from_structure, get_example_structure},
+        tests::root_dir,
+    };
+    use rstest::rstest;
+
+    #[rstest]
+    fn basic_restore(root_dir: &PathBuf) {
+        let test_dir = AbsPath::new(root_dir.join("basic_restore")).unwrap();
+        let f = get_example_structure(&test_dir, &test_dir, &test_dir);
+        example_new_machine_from_structure(&f).unwrap();
+        setup_project(&f.dotfiles, &f.home).unwrap();
+
+        let toml_content = r#"[dotfiles]
+bashrc = "~/bashrc"
+nvim = "~/config/nvim"
+"#;
+
+        let expected_config: DotConfig = toml::from_str(toml_content).unwrap();
+        let actual_config = DotConfig::from_file(&f.dotfiles.join(CONFIG_FILE_NAME)).unwrap();
+        assert_eq!(actual_config, expected_config);
+    }
 }
