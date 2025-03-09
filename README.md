@@ -137,6 +137,6 @@ dotman restore
 - Run `dotman status` periodically to ensure your symlinks are intact
 
 ## License
+[[LICENSE]]
 
-[ LICENSE](LICENSE)
 
