@@ -86,6 +86,7 @@ pub fn update(
     }
     let abs_link = home.join(link);
     if abs_link.is_symlink() || abs_link.exists() {
+        // TODO: Think about what happens if the symlink is there as it should
         return Err(E::LinkOccupied);
     }
     let mut config = DotConfig::from_file(&config_path)?;

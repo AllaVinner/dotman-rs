@@ -21,6 +21,8 @@ pub enum Commands {
     Status(StatusArgs),
     /// Update links in dotman project
     Update(UpdateArgs),
+    /// Restore dotfiles
+    Restore(RestoreArgs),
     /// Create example file structure
     Example(ExampleArgs),
 }
@@ -49,6 +51,8 @@ pub enum Examples {
     NewMachine,
     /// Existing dotman project with existing non-recorded dotfile
     NewDotfile,
+    /// Existing dotman project setup dotfiles
+    CompleteSetup,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -78,6 +82,16 @@ pub struct StatusArgs {
     /// Project to show status of
     #[arg(default_value = ".")]
     pub project: PathBuf,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct RestoreArgs {
+    /// Project to show status of
+    #[arg(default_value = ".")]
+    pub project: PathBuf,
+    /// Dotfile to setup, defaults to all dotfiles in project
+    #[arg(short, long)]
+    pub dotfile: Option<PathBuf>,
 }
 
 #[derive(Args, Debug, Clone)]

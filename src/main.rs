@@ -12,6 +12,7 @@ mod cli;
 mod config;
 mod example;
 mod init;
+mod restore;
 mod setup;
 mod status;
 mod types;
@@ -68,6 +69,16 @@ fn run_command(command: cli::Commands) -> Result<(), Box<dyn Error>> {
             let project = ProjectPath::new(normalize_path(args.project, &home, &cwd))?;
             update::update(&home, &link, &dotfile, &project)?;
         }
+        cli::Commands::Restore(args) => {
+            let home = AbsPath::new(home)?;
+            let project = ProjectPath::new(normalize_path(args.project, &home, &cwd))?;
+            match args.dotfile {
+                None => restore::restore(&project, &home)?,
+                Some(d) => {
+                    restore::restore(&project, &home)?;
+                }
+            }
+        }
     }
     Ok(())
 }
@@ -77,6 +88,7 @@ fn setup_project<P: AsRef<Path>>(base_dir: P, setup_type: cli::Examples) -> Resu
         cli::Examples::NewUser => example::example_new_user(base_dir)?,
         cli::Examples::NewMachine => example::example_new_machine(base_dir)?,
         cli::Examples::NewDotfile => example::example_new_dotfile(base_dir)?,
+        cli::Examples::CompleteSetup => example::example_complete_setup(base_dir)?,
     }
     Ok(())
 }
@@ -85,7 +97,7 @@ fn main_cli() {
     let args = cli::CLI::parse();
     match run_command(args.clone().command.unwrap()) {
         Err(e) => {
-            eprintln!("{}", e);
+            eprintln!("error: {}", e);
             std::process::exit(1);
         }
         Ok(_) => (),

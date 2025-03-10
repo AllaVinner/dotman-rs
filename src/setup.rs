@@ -104,8 +104,8 @@ mod tests {
     use rstest::rstest;
 
     #[rstest]
-    fn basic_restore(root_dir: &PathBuf) {
-        let test_dir = AbsPath::new(root_dir.join("basic_restore")).unwrap();
+    fn basic_setup(root_dir: &PathBuf) {
+        let test_dir = AbsPath::new(root_dir.join("basic_setup")).unwrap();
         let f = get_example_structure(&test_dir, &test_dir, &test_dir);
         example_new_machine_from_structure(&f).unwrap();
         setup_project(&f.dotfiles, &f.home).unwrap();

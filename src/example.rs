@@ -5,6 +5,7 @@ use std::{
     path::Path,
 };
 
+use crate::setup;
 use crate::{
     add, init,
     types::{LinkPath, ProjectPath, SourcePath},
@@ -88,6 +89,21 @@ pub fn example_new_machine_from_structure(f: &ExampleStructure) -> io::Result<()
     add::add(&f.home, &f.nvim.link, &f.dotfiles, &f.nvim.source).expect("C");
     fs::remove_file(&f.home.join(&f.bashrc.link))?;
     fs::remove_dir_all(&f.home.join(&f.nvim.link).parent().unwrap())?;
+    Ok(())
+}
+
+pub fn example_complete_setup_from_structure(f: &ExampleStructure) -> io::Result<()> {
+    example_new_machine_from_structure(f)?;
+    setup::setup_project(&f.dotfiles, &f.home).expect("setup to work");
+    Ok(())
+}
+
+pub fn example_complete_setup<P: AsRef<Path>>(base_dir: P) -> io::Result<()> {
+    let base_dir = base_dir.as_ref();
+    let home = AbsPath::new(env::var(HOME_ENV).expect("Home var not set.")).expect("");
+    let cwd = current_dir().expect("There is a current dir.");
+    let f = get_example_structure(base_dir, &home, &cwd);
+    example_complete_setup_from_structure(&f)?;
     Ok(())
 }
 
