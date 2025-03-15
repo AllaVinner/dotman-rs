@@ -104,12 +104,16 @@ fn setup_project<P: AsRef<Path>>(base_dir: P, setup_type: cli::Examples) -> Resu
 
 fn main_cli() {
     let args = cli::CLI::parse();
-    match run_command(args.clone().command.unwrap()) {
-        Err(e) => {
-            eprintln!("error: {}", e);
-            std::process::exit(1);
-        }
-        Ok(_) => (),
+
+    match args.command {
+        None => eprintln!("get help with `dotman --help`"),
+        Some(c) => match run_command(c) {
+            Ok(_) => (),
+            Err(e) => {
+                eprintln!("error: {}", e);
+                std::process::exit(1);
+            }
+        },
     };
 }
 
