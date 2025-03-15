@@ -15,16 +15,18 @@ pub enum UpdateError {
     ProjectNotInitialized,
     #[error("dotfile not found")]
     DotfileNotFound,
-    #[error("link path already occupired")]
+    #[error("link path already occupied")]
     LinkOccupied,
-    #[error("coulnd not read dotman config: {0}")]
+    #[error("could not read dotman config: {0}")]
     ReadConfigError(#[from] config::ReadError),
     #[error("Could not serialize config: {0}")]
     ConfigSerializationError(#[from] toml::ser::Error),
-    #[error("error while linking - rollback successfull - error {0}")]
+    #[error(
+        "unexpected IO error while updating dotfile, successfully rolled-back changes\n IO-Error: {0}"
+    )]
     IO(io::Error),
     #[error(
-        "error while linking - and while rolling back - error {original_error} - rollback {rollback_error}"
+        "unexpected IO error while updating dotfile, could not roll-back changes\n io-error: {original_error}\n rollback-error: {rollback_error}"
     )]
     RollbackError {
         original_error: io::Error,

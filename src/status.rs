@@ -24,6 +24,7 @@ pub fn project_summary(project: &ProjectPath, home: &AbsPath) -> Result<(), Stat
         return Err(E::ProjectNotInitialilzed);
     }
     let config = DotConfig::from_file(&abs_config)?;
+    println!("[{}]", project.file_name().unwrap().to_str().unwrap());
     for (source, link) in config.dotfiles.iter() {
         let mut missings = vec![];
         if !project.join(source).exists() {
@@ -59,7 +60,7 @@ pub fn project_summary(project: &ProjectPath, home: &AbsPath) -> Result<(), Stat
         let path_str = source
             .to_str()
             .expect("path to be able to be converted to string");
-        println!("{}", format!("{path_str}: {status_msg}"));
+        println!(" {}", format!("{path_str}: {status_msg}"));
     }
     Ok(())
 }

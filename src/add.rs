@@ -13,26 +13,28 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum AddError {
-    #[error("IO error while adding dotfile. Successfully rolled back changes. Error: {0}")]
+    #[error(
+        "unexpected IO error while adding dotfile, successfully rolled-back changes\n IO-Error: {0}"
+    )]
     IO(#[from] io::Error),
     #[error(
-        "IO error while adding dotfile. Unsuccessfully rolled back changes. Original Error: {original_error}. Rollback Error: {rollback_error}"
+        "unexpected IO error while adding dotfile, could not roll-back changes\n io-error: {original_error}\n rollback-error: {rollback_error}"
     )]
     RollbackError {
         original_error: io::Error,
         rollback_error: io::Error,
     },
-    #[error("source {0} not found")]
+    #[error("no source file or folder found at {0}")]
     SourceNotFound(PathBuf),
-    #[error("target {0} already exists")]
+    #[error("target {0} already exists in project")]
     TargetExists(PathBuf),
-    #[error("project {0} not initialized")]
-    ProjectNotInitialized(PathBuf),
-    #[error("coulnd not read dotman config: {0}")]
+    #[error("no project found at {0}")]
+    ProjectNotFound(PathBuf),
+    #[error("unable to read dotman config file: {0}")]
     ReadConfigError(#[from] config::ReadError),
-    #[error("Could not serialize config: {0}")]
+    #[error("unable to serialize dotman config: {0}")]
     ConfigSerializationError(#[from] toml::ser::Error),
-    #[error("dotfile record already present in dotman config")]
+    #[error("dotfile {0} already recorded in project")]
     DotfileRecordExists(PathBuf),
 }
 
@@ -88,11 +90,11 @@ fn add_home_dotfile(
         return Err(AddError::SourceNotFound(abs_source));
     }
     if abs_target.exists() {
-        return Err(AddError::TargetExists(abs_target));
+        return Err(AddError::TargetExists(target.to_path_buf()));
     }
     let abs_config = project.join(CONFIG_FILE_NAME);
     if !abs_config.exists() {
-        return Err(AddError::ProjectNotInitialized(abs_config));
+        return Err(AddError::ProjectNotFound(project.to_path_buf()));
     }
     let mut config = DotConfig::from_file(&abs_config)?;
     if config.dotfiles.contains_key(target) {

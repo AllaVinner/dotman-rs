@@ -11,10 +11,10 @@ use crate::{
 
 #[derive(Error, Debug)]
 pub enum RestoreError {
-    #[error("IO error while restoring dotfile. Successfully rolled back changes. Error: {0}")]
+    #[error("IO error while restoring dotfile. Successfully rolled back changes. IO-Error: {0}")]
     IO(#[from] io::Error),
     #[error(
-        "IO error while adding dotfile. Unsuccessfully rolled back changes. Original Error: {original_error}. Rollback Error: {rollback_error}"
+        "IO error while adding dotfile. Unsuccessfully rolled back changes.\n Original Error: {original_error}\n Rollback Error: {rollback_error}"
     )]
     RollbackError {
         original_error: io::Error,
