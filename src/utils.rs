@@ -1,8 +1,11 @@
 use std::{
+    fs,
     ops::Deref,
     path::{Path, PathBuf},
 };
 use thiserror::Error;
+
+use crate::{types::ProjectPath, CONFIG_FILE_NAME};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AbsPath(PathBuf);
@@ -18,6 +21,10 @@ impl AbsPath {
         } else {
             Err(AbsPathError)
         }
+    }
+
+    pub fn join_abs<P: AsRef<Path>>(&self, path: P) -> Self {
+        AbsPath(self.0.join(path.as_ref()))
     }
 }
 
@@ -130,6 +137,49 @@ pub fn normalize_path<P: AsRef<Path>, H: AsRef<Path>, W: AsRef<Path>>(
     let end_path: PathBuf = comp_iter.collect();
     let path = base_path.join(end_path);
     return resolve_path(path);
+}
+
+fn filename<P: AsRef<Path>>(path: P) -> String {
+    path.as_ref()
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("")
+        .to_string()
+}
+
+pub fn find_dotman_projects(base_dir: &AbsPath) -> Vec<ProjectPath> {
+    let mut projects: Vec<ProjectPath> = vec![];
+    let mut to_visit: Vec<AbsPath> = vec![base_dir.clone()];
+    while let Some(current_dir) = to_visit.pop() {
+        let dir_iter: fs::ReadDir = match fs::read_dir(current_dir) {
+            Ok(res) => res,
+            Err(_) => return vec![],
+        };
+        for entry in dir_iter {
+            let entry = match entry {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
+            let path = match AbsPath::new(entry.path()) {
+                Ok(p) => p,
+                Err(_) => continue,
+            };
+            if path.is_dir() {
+                to_visit.push(path);
+            } else {
+                if filename(&path) == CONFIG_FILE_NAME {
+                    match path.parent() {
+                        Some(p) => match ProjectPath::new(p) {
+                            Ok(ap) => projects.push(ap),
+                            Err(_) => continue,
+                        },
+                        None => continue,
+                    }
+                }
+            }
+        }
+    }
+    return projects;
 }
 
 #[cfg(test)]

@@ -59,8 +59,17 @@ fn run_command(command: cli::Commands) -> Result<(), Box<dyn Error>> {
         }
         cli::Commands::Status(args) => {
             let home = AbsPath::new(home)?;
-            let project = ProjectPath::new(normalize_path(args.project, &home, &cwd))?;
-            status::project_summary(&project, &home)?;
+            if args.recursive {
+                let base_dir = AbsPath::new(normalize_path(args.project, &home, &cwd))?;
+                let projects = utils::find_dotman_projects(&base_dir);
+                for project in projects {
+                    status::project_summary(&project, &home)?;
+                    println!("");
+                }
+            } else {
+                let project = ProjectPath::new(normalize_path(args.project, &home, &cwd))?;
+                status::project_summary(&project, &home)?;
+            }
         }
         cli::Commands::Update(args) => {
             let home = AbsPath::new(home)?;

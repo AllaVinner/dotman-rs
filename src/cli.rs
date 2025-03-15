@@ -82,6 +82,9 @@ pub struct StatusArgs {
     /// Project to show status of
     #[arg(default_value = ".")]
     pub project: PathBuf,
+    /// Look for dotman project recursively
+    #[arg(short, long)]
+    pub recursive: bool,
 }
 
 #[derive(Args, Debug, Clone)]
